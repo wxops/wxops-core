@@ -82,15 +82,15 @@ uninstall-dev: ## Remove directly applied XRDs and Compositions
 
 .PHONY: changelog
 changelog: ## Prepend unreleased changes to CHANGELOG.md — preserves manual edits (requires git-cliff)
-	git-cliff --unreleased --prepend CHANGELOG.md
+	git-cliff --unreleased --prepend CHANGELOG.md --strip all
 
 .PHONY: changelog-full
 changelog-full: ## Fully regenerate CHANGELOG.md from scratch — overwrites manual edits
 	git-cliff -o CHANGELOG.md
 
 .PHONY: changelog-preview
-changelog-preview: ## Print upcoming changelog to stdout without writing
-	git-cliff --unreleased
+changelog-preview: ## Preview unreleased changelog without writing
+	git-cliff --unreleased --strip all
 
 # ── Release ───────────────────────────────────────────────────────────────────
 

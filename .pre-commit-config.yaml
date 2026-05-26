@@ -1,17 +1,44 @@
 # .pre-commit-config.yaml
 #
-# Install:  pip install pre-commit && pre-commit install
+# Install (run both — they register different git hooks):
+#   pip install pre-commit
+#   pre-commit install                        # registers .git/hooks/pre-commit
+#   pre-commit install --hook-type commit-msg # registers .git/hooks/commit-msg
+#
 # Run all:  pre-commit run --all-files
 # Update:   pre-commit autoupdate
 #
-# Hooks validate three things before every commit:
-#   1. YAML style  (yamllint)
-#   2. Kubernetes schema  (kubeconform — validates XRDs, Compositions, providers)
-#   3. Crossplane package build  (crossplane xpkg build for each package)
+# Hooks:
+#   commit-msg  1. Conventional commit format enforcement
+#   pre-commit  2. YAML style          (yamllint)
+#               3. Kubernetes schema   (kubeconform)
+#               4. Crossplane build    (crossplane xpkg build)
+#
+# Allowed commit types (must stay in sync with cliff.toml commit_parsers):
+#   feat | fix | perf | refactor | docs | test | chore | revert
 
 default_stages: [pre-commit]
 
 repos:
+  # ── Conventional commit enforcement (commit-msg stage) ───────────────────────
+  # Validates commit messages against the Conventional Commits spec.
+  # Types mirror cliff.toml commit_parsers — adding a type here requires a
+  # matching parser entry there so it appears in the changelog.
+  - repo: https://github.com/compilerla/conventional-pre-commit
+    rev: v3.4.0
+    hooks:
+      - id: conventional-pre-commit
+        stages: [commit-msg]
+        args:
+          - feat    # new feature        → Features
+          - fix     # bug fix            → Bug Fixes
+          - perf    # performance        → Performance
+          - refactor # code restructure  → Refactor
+          - docs    # documentation      → Documentation
+          - test    # tests              → Testing
+          - chore   # maintenance        → Chores  (chore(ci) → CI/CD)
+          - revert  # revert a commit    → Reverts
+
   # ── Standard file hygiene ────────────────────────────────────────────────────
   - repo: https://github.com/pre-commit/pre-commit-hooks
     rev: v6.0.0

@@ -49,7 +49,8 @@ jobs:
         run: |
           curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh" | sh
           sudo mv crossplane /usr/local/bin/crossplane
-          crossplane version
+          # Prevent error when require kubeconfig for server side validation
+          crossplane version --client
 
       - name: Log in to container registry
         uses: docker/login-action@v3
@@ -77,8 +78,8 @@ jobs:
             ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:latest \
             -f platform-wxops-${{ matrix.package }}.xpkg
 
-  update-configurations:
-    name: Update configuration.yaml versions
+  create-release:
+    name: Create Gitea release
     runs-on: ubuntu-latest
     needs: build-push
 
@@ -86,7 +87,55 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITEA_TOKEN }}
+          fetch-depth: 0
+
+      - name: Install git-cliff
+        run: pip install git-cliff
+
+      - name: Build release body
+        env:
+          VERSION: ${{ github.ref_name }}
+        run: |
+          # Generate the changelog section for this tag only
+          git-cliff --current --strip all > /tmp/cliff-section.md
+
+          # Combine custom release notes (if present) with the cliff section
+          notes_file="release-notes/${VERSION}.md"
+          if [ -f "$notes_file" ]; then
+            cat "$notes_file" > /tmp/release-body.md
+            echo "" >> /tmp/release-body.md
+            echo "---" >> /tmp/release-body.md
+            echo "" >> /tmp/release-body.md
+          fi
+          cat /tmp/cliff-section.md >> /tmp/release-body.md
+
+      - name: Create Gitea release
+        env:
+          VERSION: ${{ github.ref_name }}
+          GITEA_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
+          GITEA_HOST: gitea.xeusnguyen.xyz
+          GITEA_REPO: platform-team/wxops-core
+        run: |
+          body=$(cat /tmp/release-body.md)
+          curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${GITEA_REPO}/releases" \
+            -H "Authorization: token ${GITEA_TOKEN}" \
+            -H "Content-Type: application/json" \
+            -d "$(jq -n \
+              --arg tag  "$VERSION" \
+              --arg name "Release ${VERSION}" \
+              --arg body "$body" \
+              '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')"
+
+  update-configurations:
+    name: Update install manifest versions
+    runs-on: ubuntu-latest
+    needs: build-push
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
       - name: Update spec.package to new version
         env:
