@@ -6,52 +6,26 @@ Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
 Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
 
-> This file is regenerated from git history by running `make changelog` (uses [git-cliff](https://git-cliff.org/)).
-> Do not edit it manually.
+> Regenerated from git history via `make changelog` (uses [git-cliff](https://git-cliff.org/)).
 
 ---
 
-## XRD API version matrix
+## [v0.1.0] — 2026-05-26
 
-| Package | v1alpha1 | v1beta1 | v1 |
-|---|---|---|---|
-| gitea-user | ✓ introduced `v0.1.0` | — | — |
-| gitea-org | ✓ introduced `v0.1.0` | — | — |
-| gitea-team | ✓ introduced `v0.1.0` | — | — |
-| gitea-repository | ✓ introduced `v0.1.0` | — | — |
-
-Legend: ✓ = served and storage · (d) = deprecated, served only · — = not defined
-
----
-
-## [Unreleased]
-
-### Changed
-
-- Migrated from kubebuilder Go controller to Crossplane v2 + provider-terraform architecture.
-- Packages moved to `package/` directory (one sub-directory per Configuration package).
-- Added `VERSIONS.yaml` for unified package and XRD API version tracking.
-- Added `.pre-commit-config.yaml` with YAML lint, kubeconform, and crossplane build hooks.
-- Added `cliff.toml` for automated changelog generation via `git-cliff`.
-
----
-
-## [v0.1.0] — 2026-05-25
-
-Initial release of the W'xOps Gitea management platform packages.
+Initial release of the W'xOps Gitea management platform on **Crossplane v2 + provider-terraform**.
 
 ### Added
 
-- `gitea-user` — `XGiteaUser` XRD `v1alpha1` + Composition (inline Terraform Workspace).
-- `gitea-org` — `XGiteaOrg` XRD `v1alpha1` + Composition.
-- `gitea-team` — `XGiteaTeam` XRD `v1alpha1` + Composition (includes membership reconciliation).
-- `gitea-repository` — `XGiteaRepository` XRD `v1alpha1` + Composition.
+- `XGiteaUser` — manages Gitea user lifecycle with auto-generated initial password and `visibility` control.
+- `XGiteaOrg` — manages Gitea organization lifecycle.
+- `XGiteaTeam` — manages Gitea team and member reconciliation within an organization.
+- `XGiteaRepository` — manages Gitea repository lifecycle within an organization.
 - Shared providers manifest (`providers/`): `provider-terraform`, `function-patch-and-transform`, `function-go-templating`, `ProviderConfig`.
-- Kustomize overlays: production (`package/kustomization.yaml`) and dev (`package/dev/kustomization.yaml`).
-- Example XR YAML files under `examples/`.
-- Gitea CI workflow `.gitea/workflows/publish-packages.yaml`: builds and pushes all packages on `v*` tag, auto-bumps `configuration.yaml`.
+- Production install overlay (`package/install/`) and development overlay (`package/dev/`).
+- Gitea CI workflow: builds and pushes all packages on `v*` tag, auto-bumps install manifests.
+- `make release VERSION=vX.Y.Z` for one-command tagging and release triggering.
 
-### XRD API versions introduced
+### XRD API versions
 
 | Resource | API Version | Kind | Scope |
 |---|---|---|---|
@@ -62,5 +36,4 @@ Initial release of the W'xOps Gitea management platform packages.
 
 ---
 
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.0...HEAD
 [v0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0

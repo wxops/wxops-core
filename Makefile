@@ -88,6 +88,19 @@ changelog: ## Regenerate CHANGELOG.md from git history (requires git-cliff)
 changelog-preview: ## Print upcoming changelog to stdout without writing
 	git-cliff
 
+# ── Release ───────────────────────────────────────────────────────────────────
+
+.PHONY: release
+release: ## Tag and push a release, triggering CI (usage: make release VERSION=v0.2.0)
+	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
+		(echo "error: VERSION must match v<major>.<minor>.<patch>, e.g. make release VERSION=v0.2.0" >&2; exit 1)
+	@git diff --quiet && git diff --cached --quiet || \
+		(echo "error: working tree has uncommitted changes — commit or stash before releasing" >&2; exit 1)
+	@echo "→ tagging $(VERSION)"
+	@git tag $(VERSION)
+	@echo "→ pushing $(VERSION) to origin — CI will build and publish all packages"
+	@git push origin $(VERSION)
+
 # ── Help ─────────────────────────────────────────────────────────────────────
 
 .PHONY: help
