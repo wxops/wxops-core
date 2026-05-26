@@ -21,7 +21,8 @@ jobs:
         run: |
           curl -sL "https://raw.githubusercontent.com/crossplane/crossplane/master/install.sh" | sh
           sudo mv crossplane /usr/local/bin/crossplane
-          crossplane version
+          # Prevent error when require kubeconfig for server side validation
+          crossplane version --client
 
       - name: Run package validation
         run: bash scripts/validate-packages.sh
