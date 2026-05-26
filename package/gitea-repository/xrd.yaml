@@ -1,0 +1,81 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xgitearepos.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XGiteaRepository
+    plural: xgitearepos
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - giteaUrl
+                    - orgName
+                    - repoName
+                    - credentialsSecretRef
+                  properties:
+                    giteaUrl:
+                      type: string
+                      description: Base URL of the Gitea instance.
+                    insecure:
+                      type: boolean
+                      default: false
+                    orgName:
+                      type: string
+                      description: Organization that owns the repository.
+                    repoName:
+                      type: string
+                      description: Repository name (immutable after creation).
+                    description:
+                      type: string
+                      default: ""
+                    private:
+                      type: boolean
+                      default: false
+                    autoInit:
+                      type: boolean
+                      default: true
+                      description: Initialize the repository with a README.
+                    defaultBranch:
+                      type: string
+                      default: main
+                    hasIssues:
+                      type: boolean
+                      default: true
+                    hasWiki:
+                      type: boolean
+                      default: false
+                    hasProjects:
+                      type: boolean
+                      default: false
+                    hasPullRequests:
+                      type: boolean
+                      default: true
+                    credentialsSecretRef:
+                      type: object
+                      description: |
+                        Secret holding the Gitea admin token in tfvars format:
+                          gitea_token = "admin-token"
+                      required:
+                        - name
+                        - namespace
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string

@@ -1,0 +1,57 @@
+# VERSIONS.yaml — single source of truth for package and XRD API versions.
+#
+# Two axes:
+#   package  — OCI image version in the registry (bumped on every git tag)
+#   api      — Kubernetes XRD API version(s) served by this package
+#
+# Rules:
+#   • Never remove an entry from api.served — that is a breaking change.
+#   • Adding a new api.served version → bump package minor (x.Y.0).
+#   • Schema change within a version (backward-compat) → bump package patch (x.y.Z).
+#   • Breaking schema change → add a new api version first, then bump package major.
+#
+# Updated automatically by CI on tag push (package.current).
+# Updated manually when XRD spec.versions changes (api.*).
+
+packages:
+
+  gitea-user:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Manages a single Gitea user lifecycle (create / update / delete).
+
+  gitea-org:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Manages a Gitea organisation with visibility and metadata.
+
+  gitea-team:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Manages a team inside a Gitea organisation, including membership.
+
+  gitea-repository:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Manages a Gitea repository owned by an organisation.
+
+# Utility compositions — not yet published as standalone OCI packages.
+utilities:
+
+  random-password:
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Generates a random password via the Terraform random provider.

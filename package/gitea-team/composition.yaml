@@ -1,0 +1,212 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgiteateams.platform.wxops.cloud
+  labels:
+    crossplane.io/xrd: xgiteateams.platform.wxops.cloud
+spec:
+  compositeTypeRef:
+    apiVersion: platform.wxops.cloud/v1alpha1
+    kind: XGiteaTeam
+
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: tf-workspace
+            base:
+              apiVersion: tf.upbound.io/v1beta1
+              kind: Workspace
+              spec:
+                providerConfigRef:
+                  name: default
+                forProvider:
+                  source: Inline
+                  module: |
+                    terraform {
+                      required_providers {
+                        gitea = {
+                          source  = "go-gitea/gitea"
+                          version = "~> 0.7.0"
+                        }
+                      }
+                    }
+
+                    variable "gitea_url"  { type = string }
+                    variable "insecure" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "org_name"  { type = string }
+                    variable "team_name" { type = string }
+                    variable "description" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "permission" {
+                      type    = string
+                      default = "read"
+                    }
+                    variable "units" {
+                      type    = string
+                      default = "repo.code,repo.issues,repo.pulls"
+                    }
+                    variable "include_all_repositories" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "can_create_repos" {
+                      type    = bool
+                      default = false
+                    }
+                    # Comma-separated usernames. Empty string means no members.
+                    variable "members" {
+                      type    = string
+                      default = ""
+                    }
+
+                    variable "gitea_token" {
+                      type      = string
+                      sensitive = true
+                    }
+
+                    provider "gitea" {
+                      base_url = var.gitea_url
+                      token    = var.gitea_token
+                      insecure = var.insecure
+                    }
+
+                    resource "gitea_team" "this" {
+                      name                     = var.team_name
+                      organisation             = var.org_name
+                      description              = var.description
+                      permission               = var.permission
+                      units                    = var.units
+                      include_all_repositories = var.include_all_repositories
+                      can_create_repos         = var.can_create_repos
+                    }
+
+                    # Membership is reconciled on every sync.
+                    # Removing a username from the list removes them from the team.
+                    locals {
+                      member_list = var.members == "" ? [] : [
+                        for m in split(",", var.members) : trimspace(m)
+                      ]
+                    }
+
+                    resource "gitea_team_membership" "this" {
+                      for_each = toset(local.member_list)
+                      team_id  = gitea_team.this.id
+                      username = each.key
+                    }
+
+                    output "team_id"   { value = gitea_team.this.id }
+                    output "team_name" { value = gitea_team.this.name }
+
+                  vars:
+                    - key: gitea_url
+                      value: placeholder
+                    - key: org_name
+                      value: placeholder
+                    - key: team_name
+                      value: placeholder
+                    - key: description
+                      value: ""
+                    - key: permission
+                      value: read
+                    - key: units
+                      value: "repo.code,repo.issues,repo.pulls"
+                    - key: include_all_repositories
+                      value: "false"
+                    - key: can_create_repos
+                      value: "false"
+                    - key: members
+                      value: ""
+                    - key: insecure
+                      value: "false"
+
+                  varFiles:
+                    - source: SecretKey
+                      secretKeyRef:
+                        namespace: placeholder
+                        name: placeholder
+                        key: credentials
+
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+                  name: placeholder
+
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.uid
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "tf-gitea-team-%s"
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.giteaUrl
+                toFieldPath: spec.forProvider.vars[0].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.orgName
+                toFieldPath: spec.forProvider.vars[1].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.teamName
+                toFieldPath: spec.forProvider.vars[2].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.description
+                toFieldPath: spec.forProvider.vars[3].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.permission
+                toFieldPath: spec.forProvider.vars[4].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.units
+                toFieldPath: spec.forProvider.vars[5].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.includeAllRepositories
+                toFieldPath: spec.forProvider.vars[6].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.canCreateRepos
+                toFieldPath: spec.forProvider.vars[7].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.members
+                toFieldPath: spec.forProvider.vars[8].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.insecure
+                toFieldPath: spec.forProvider.vars[9].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.namespace
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.namespace
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.name
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.name

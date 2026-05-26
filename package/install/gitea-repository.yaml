@@ -1,0 +1,14 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: platform-wxops-gitea-repository
+  annotations:
+    meta.crossplane.io/version: v0.1.0
+spec:
+  package: ghcr.io/wxops/platform-wxops-gitea-repository:v0.1.0
+  packagePullPolicy: IfNotPresent
+  revisionActivationPolicy: Automatic
+
+  # packagePullSecretRef:
+  #   name: registry-credentials
+  #   namespace: crossplane-system

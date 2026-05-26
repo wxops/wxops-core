@@ -1,0 +1,38 @@
+# .yamllint.yaml
+#
+# Style rules for YAML files in wxops-core.
+# Intentionally permissive on line length because Crossplane Compositions
+# embed multi-line HCL blocks in string literals.
+
+extends: default
+
+rules:
+  # HCL embedded in composition.yaml strings can exceed 80 chars
+  line-length:
+    max: 200
+    level: warning
+
+  # Compositions use --- to separate documents in some patterns
+  document-start: disable
+
+  # Multiple spaces in value positions occur in aligned YAML tables
+  indentation:
+    spaces: 2
+    indent-sequences: true
+    check-multi-line-strings: false
+
+  # Allow empty lines between top-level keys for readability
+  empty-lines:
+    max: 2
+    max-start: 0
+    max-end: 0
+
+  # Crossplane often uses truthy values as strings ("false", "true")
+  truthy:
+    allowed-values: ["true", "false", "yes", "no", "on", "off"]
+    check-keys: false
+
+  comments:
+    min-spaces-from-content: 1
+
+  comments-indentation: disable

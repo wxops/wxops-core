@@ -1,0 +1,41 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xrandompasswords.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  # Cluster-scoped XR (v2 default). Use LegacyCluster if you need namespace-scoped Claims.
+  scope: Cluster
+  names:
+    kind: XRandomPassword
+    plural: xrandompasswords
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    length:
+                      type: integer
+                      description: Length of the generated password.
+                      default: 32
+                      minimum: 8
+                      maximum: 128
+                    special:
+                      type: boolean
+                      description: Include special characters.
+                      default: true
+                    overrideSpecial:
+                      type: string
+                      description: Override the allowed special character set.
+                      default: "!@#$%^&*"

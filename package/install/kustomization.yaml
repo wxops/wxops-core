@@ -1,0 +1,15 @@
+# Production install — pulls each Configuration package from the OCI registry.
+# Crossplane resolves and installs the XRDs and Compositions automatically.
+#
+# Usage:
+#   kubectl apply -k package/install/
+#
+# Prerequisites: ensure spec.package in each file points to your published image.
+# CI auto-bumps these on every v* tag push via .gitea/workflows/publish-packages.yaml.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - gitea-user.yaml
+  - gitea-org.yaml
+  - gitea-team.yaml
+  - gitea-repository.yaml

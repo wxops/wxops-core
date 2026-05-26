@@ -1,0 +1,227 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgiteausers.platform.wxops.cloud
+  labels:
+    crossplane.io/xrd: xgiteausers.platform.wxops.cloud
+spec:
+  compositeTypeRef:
+    apiVersion: platform.wxops.cloud/v1alpha1
+    kind: XGiteaUser
+
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: tf-workspace
+            base:
+              apiVersion: tf.upbound.io/v1beta1
+              kind: Workspace
+              spec:
+                providerConfigRef:
+                  name: default
+                forProvider:
+                  source: Inline
+                  module: |
+                    terraform {
+                      required_providers {
+                        random = {
+                          source  = "hashicorp/random"
+                          version = "~> 3.6"
+                        }
+                        gitea = {
+                          source  = "go-gitea/gitea"
+                          version = "~> 0.7.0"
+                        }
+                      }
+                    }
+
+                    variable "gitea_url" { type = string }
+                    variable "insecure" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "username" { type = string }
+                    variable "email"    { type = string }
+                    variable "full_name" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "admin" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "must_change_password" {
+                      type    = bool
+                      default = true
+                    }
+                    variable "password_length" {
+                      type    = number
+                      default = 24
+                    }
+                    variable "password_special" {
+                      type    = bool
+                      default = true
+                    }
+                    variable "visibility" {
+                      type    = string
+                      default = "private"
+                    }
+
+                    variable "gitea_token" {
+                      type      = string
+                      sensitive = true
+                    }
+
+                    provider "gitea" {
+                      base_url = var.gitea_url
+                      token    = var.gitea_token
+                      insecure = var.insecure
+                    }
+
+                    resource "random_password" "initial" {
+                      length           = var.password_length
+                      special          = var.password_special
+                      override_special = "!@#$%^&*"
+                    }
+
+                    resource "gitea_user" "this" {
+                      username             = var.username
+                      login_name           = var.username
+                      email                = var.email
+                      password             = random_password.initial.result
+                      full_name            = var.full_name
+                      admin                = var.admin
+                      must_change_password = var.must_change_password
+                      visibility           = var.visibility
+                      # Requires a working SMTP server configured in Gitea.
+                      # Sends a welcome email with login credentials on account creation.
+                      send_notification    = true
+                    }
+
+                    output "user_id"  { value = gitea_user.this.id }
+                    output "username" { value = gitea_user.this.username }
+                    output "initial_password" {
+                      value     = random_password.initial.result
+                      sensitive = true
+                    }
+
+                  vars:
+                    - key: gitea_url
+                      value: placeholder
+                    - key: username
+                      value: placeholder
+                    - key: email
+                      value: placeholder
+                    - key: full_name
+                      value: ""
+                    - key: admin
+                      value: "false"
+                    - key: must_change_password
+                      value: "true"
+                    - key: insecure
+                      value: "false"
+                    - key: password_length
+                      value: "24"
+                    - key: password_special
+                      value: "true"
+                    - key: visibility
+                      value: "private"
+
+                  varFiles:
+                    - source: SecretKey
+                      secretKeyRef:
+                        namespace: placeholder
+                        name: placeholder
+                        key: credentials
+
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+                  name: placeholder
+
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.uid
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "tf-gitea-user-%s"
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.giteaUrl
+                toFieldPath: spec.forProvider.vars[0].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.username
+                toFieldPath: spec.forProvider.vars[1].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.email
+                toFieldPath: spec.forProvider.vars[2].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.fullName
+                toFieldPath: spec.forProvider.vars[3].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.admin
+                toFieldPath: spec.forProvider.vars[4].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.mustChangePassword
+                toFieldPath: spec.forProvider.vars[5].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.insecure
+                toFieldPath: spec.forProvider.vars[6].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.passwordLength
+                toFieldPath: spec.forProvider.vars[7].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.passwordSpecial
+                toFieldPath: spec.forProvider.vars[8].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.visibility
+                toFieldPath: spec.forProvider.vars[9].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.namespace
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.namespace
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.name
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.name
