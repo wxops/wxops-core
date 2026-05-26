@@ -55,10 +55,15 @@ body = """
 footer = """
 ---
 {% for release in releases %}\
+{% if release.version %}\
 [{{ release.version | trim_start_matches(pat="v") }}]: \
 https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/{{ release.version }}
+{% endif %}\
 {% endfor %}\
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ releases | first | map(attribute="version") | first }}...HEAD
+{% set latest = releases | filter(attribute="version") | first %}\
+{% if latest %}\
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ latest.version }}...HEAD
+{% endif %}\
 """
 
 trim = true
