@@ -1,0 +1,90 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xgiteausers.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XGiteaUser
+    plural: xgiteausers
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - giteaUrl
+                    - username
+                    - email
+                    - credentialsSecretRef
+                  properties:
+                    giteaUrl:
+                      type: string
+                      description: Base URL of the Gitea instance (e.g. https://gitea.example.com).
+                    insecure:
+                      type: boolean
+                      default: false
+                      description: Skip TLS verification. True only for local/dev instances.
+                    username:
+                      type: string
+                      description: Login username for the Gitea account.
+                    email:
+                      type: string
+                      description: Email address for the Gitea account. Gitea sends the welcome notification here.
+                    fullName:
+                      type: string
+                      default: ""
+                      description: Display name shown in the Gitea UI.
+                    admin:
+                      type: boolean
+                      default: false
+                      description: Grant site administrator privileges.
+                    mustChangePassword:
+                      type: boolean
+                      default: true
+                      description: |
+                        Require the user to set a new password on first login.
+                        Defaults to true — always recommended when send_notification is on
+                        because the initial password is auto-generated.
+                    visibility:
+                      type: string
+                      default: "private"
+                      enum: ["public", "limited", "private"]
+                      description: |
+                        Account visibility level. A private user won't appear in the member list of an organization.
+                    passwordLength:
+                      type: integer
+                      default: 24
+                      minimum: 16
+                      maximum: 128
+                      description: Length of the auto-generated initial password.
+                    passwordSpecial:
+                      type: boolean
+                      default: true
+                      description: Include special characters in the auto-generated password.
+                    credentialsSecretRef:
+                      type: object
+                      description: |
+                        Secret holding the Gitea admin token in tfvars format:
+                          gitea_token = "admin-api-token"
+                        No password field is needed — the initial user password is
+                        generated automatically and emailed to the user via Gitea SMTP.
+                      required:
+                        - name
+                        - namespace
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string

@@ -1,0 +1,11 @@
+# Root install entry-point. Delegates to the appropriate overlay:
+#
+#   Production (OCI registry):  kubectl apply -k package/install/
+#   Development (direct apply): kubectl apply -k package/dev/
+#
+# This file re-exports the production overlay so that the top-level
+# `make install` target can use the shorter `kubectl apply -k package/`.
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - install/

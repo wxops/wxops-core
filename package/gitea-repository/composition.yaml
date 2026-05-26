@@ -1,0 +1,238 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgitearepos.platform.wxops.cloud
+  labels:
+    crossplane.io/xrd: xgitearepos.platform.wxops.cloud
+spec:
+  compositeTypeRef:
+    apiVersion: platform.wxops.cloud/v1alpha1
+    kind: XGiteaRepository
+
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: tf-workspace
+            base:
+              apiVersion: tf.upbound.io/v1beta1
+              kind: Workspace
+              spec:
+                providerConfigRef:
+                  name: default
+                forProvider:
+                  source: Inline
+                  module: |
+                    terraform {
+                      required_providers {
+                        gitea = {
+                          source  = "go-gitea/gitea"
+                          version = "~> 0.7.0"
+                        }
+                      }
+                    }
+
+                    variable "gitea_url"  { type = string }
+                    variable "insecure" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "org_name"  { type = string }
+                    variable "repo_name" { type = string }
+                    variable "description" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "private" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "auto_init" {
+                      type    = bool
+                      default = true
+                    }
+                    variable "default_branch" {
+                      type    = string
+                      default = "main"
+                    }
+                    variable "has_issues" {
+                      type    = bool
+                      default = true
+                    }
+                    variable "has_wiki" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "has_projects" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "has_pull_requests" {
+                      type    = bool
+                      default = true
+                    }
+
+                    variable "gitea_token" {
+                      type      = string
+                      sensitive = true
+                    }
+
+                    provider "gitea" {
+                      base_url = var.gitea_url
+                      token    = var.gitea_token
+                      insecure = var.insecure
+                    }
+
+                    resource "gitea_repository" "this" {
+                      username          = var.org_name
+                      name              = var.repo_name
+                      description       = var.description
+                      private           = var.private
+                      auto_init         = var.auto_init
+                      default_branch    = var.default_branch
+                      has_issues        = var.has_issues
+                      has_wiki          = var.has_wiki
+                      has_projects      = var.has_projects
+                      has_pull_requests = var.has_pull_requests
+                    }
+
+                    output "repo_id"    { value = gitea_repository.this.id }
+                    output "clone_url"  { value = gitea_repository.this.clone_url }
+                    output "ssh_url"    { value = gitea_repository.this.ssh_url }
+                    output "html_url"   { value = gitea_repository.this.html_url }
+
+                  vars:
+                    - key: gitea_url
+                      value: placeholder
+                    - key: org_name
+                      value: placeholder
+                    - key: repo_name
+                      value: placeholder
+                    - key: description
+                      value: ""
+                    - key: private
+                      value: "false"
+                    - key: auto_init
+                      value: "true"
+                    - key: default_branch
+                      value: main
+                    - key: has_issues
+                      value: "true"
+                    - key: has_wiki
+                      value: "false"
+                    - key: has_projects
+                      value: "false"
+                    - key: has_pull_requests
+                      value: "true"
+                    - key: insecure
+                      value: "false"
+
+                  varFiles:
+                    - source: SecretKey
+                      secretKeyRef:
+                        namespace: placeholder
+                        name: placeholder
+                        key: credentials
+
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+                  name: placeholder
+
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.uid
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "tf-gitea-repo-%s"
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.giteaUrl
+                toFieldPath: spec.forProvider.vars[0].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.orgName
+                toFieldPath: spec.forProvider.vars[1].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.repoName
+                toFieldPath: spec.forProvider.vars[2].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.description
+                toFieldPath: spec.forProvider.vars[3].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.private
+                toFieldPath: spec.forProvider.vars[4].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.autoInit
+                toFieldPath: spec.forProvider.vars[5].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.defaultBranch
+                toFieldPath: spec.forProvider.vars[6].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.hasIssues
+                toFieldPath: spec.forProvider.vars[7].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.hasWiki
+                toFieldPath: spec.forProvider.vars[8].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.hasProjects
+                toFieldPath: spec.forProvider.vars[9].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.hasPullRequests
+                toFieldPath: spec.forProvider.vars[10].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.insecure
+                toFieldPath: spec.forProvider.vars[11].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.namespace
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.namespace
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.name
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.name

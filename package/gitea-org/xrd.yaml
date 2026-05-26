@@ -1,0 +1,70 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xgiteaorgs.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XGiteaOrg
+    plural: xgiteaorgs
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - giteaUrl
+                    - orgName
+                    - credentialsSecretRef
+                  properties:
+                    giteaUrl:
+                      type: string
+                      description: Base URL of the Gitea instance (e.g. https://gitea.example.com).
+                    insecure:
+                      type: boolean
+                      default: false
+                      description: Skip TLS verification. True only for local/dev instances.
+                    orgName:
+                      type: string
+                      description: Gitea organization login name (immutable after creation).
+                    fullName:
+                      type: string
+                      default: ""
+                      description: Display name shown in the Gitea UI.
+                    description:
+                      type: string
+                      default: ""
+                    website:
+                      type: string
+                      default: ""
+                    location:
+                      type: string
+                      default: ""
+                    visibility:
+                      type: string
+                      default: public
+                      enum: [public, limited, private]
+                    credentialsSecretRef:
+                      type: object
+                      description: |
+                        Secret holding the Gitea admin token in tfvars format:
+                          gitea_token = "admin-token"
+                      required:
+                        - name
+                        - namespace
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string

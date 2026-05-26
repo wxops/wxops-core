@@ -1,0 +1,86 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xgiteateams.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XGiteaTeam
+    plural: xgiteateams
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - giteaUrl
+                    - orgName
+                    - teamName
+                    - credentialsSecretRef
+                  properties:
+                    giteaUrl:
+                      type: string
+                      description: Base URL of the Gitea instance.
+                    insecure:
+                      type: boolean
+                      default: false
+                    orgName:
+                      type: string
+                      description: Name of the organization this team belongs to.
+                    teamName:
+                      type: string
+                      description: Team name within the organization.
+                    description:
+                      type: string
+                      default: ""
+                    permission:
+                      type: string
+                      default: read
+                      enum: [none, read, write, admin, owner]
+                      description: Base permission level for all team members.
+                    units:
+                      type: string
+                      default: "repo.code,repo.issues,repo.pulls"
+                      description: |
+                        Comma-separated repository feature units the team has access to.
+                        Valid values: repo.code, repo.issues, repo.ext_issues, repo.wiki,
+                        repo.pulls, repo.releases, repo.projects, repo.ext_wiki
+                    includeAllRepositories:
+                      type: boolean
+                      default: false
+                      description: Automatically grant access to all org repositories.
+                    canCreateRepos:
+                      type: boolean
+                      default: false
+                      description: Allow team members to create repositories in the org.
+                    members:
+                      type: string
+                      default: ""
+                      description: |
+                        Comma-separated list of Gitea usernames to add as team members.
+                        Membership is reconciled on every sync — removing a name removes
+                        the user from the team. Works for both managed and pre-existing users.
+                    credentialsSecretRef:
+                      type: object
+                      description: |
+                        Secret holding the Gitea admin token in tfvars format:
+                          gitea_token = "admin-token"
+                      required:
+                        - name
+                        - namespace
+                      properties:
+                        name:
+                          type: string
+                        namespace:
+                          type: string

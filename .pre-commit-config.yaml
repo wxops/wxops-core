@@ -1,0 +1,85 @@
+# .pre-commit-config.yaml
+#
+# Install:  pip install pre-commit && pre-commit install
+# Run all:  pre-commit run --all-files
+# Update:   pre-commit autoupdate
+#
+# Hooks validate three things before every commit:
+#   1. YAML style  (yamllint)
+#   2. Kubernetes schema  (kubeconform — validates XRDs, Compositions, providers)
+#   3. Crossplane package build  (crossplane xpkg build for each package)
+
+default_stages: [pre-commit]
+
+repos:
+  # ── Standard file hygiene ────────────────────────────────────────────────────
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v6.0.0
+    hooks:
+      - id: trailing-whitespace
+      - id: end-of-file-fixer
+      - id: check-yaml
+        args: [--allow-multiple-documents]
+      - id: check-merge-conflict
+      - id: mixed-line-ending
+        args: [--fix=lf]
+
+  # ── YAML style ───────────────────────────────────────────────────────────────
+  - repo: https://github.com/adrienverge/yamllint
+    rev: v1.38.0
+    hooks:
+      - id: yamllint
+        args: [-c, .yamllint.yaml]
+        # Exclude generated or vendor-style files
+        exclude: |
+          (?x)^(
+            \.git/.*
+          )$
+
+  # ── Kubernetes manifest validation ──────────────────────────────────────────
+  # kubeconform validates manifests against published JSON schemas.
+  # Runs as a local hook using the system-installed kubeconform binary.
+  # Install: https://github.com/yannh/kubeconform#installation
+  # --ignore-missing-schemas lets Crossplane-specific kinds (XRD, Composition,
+  # Workspace, etc.) pass through without error — they are checked by the
+  # crossplane-validate hook below.
+  - repo: local
+    hooks:
+      - id: kubeconform
+        name: kubeconform
+        language: system
+        entry: kubeconform
+        args:
+          - -schema-location
+          - default
+          - -schema-location
+          - "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+          - -ignore-missing-schemas
+          - -summary
+          - -output
+          - pretty
+        files: \.(yaml|yml)$
+        exclude: |
+          (?x)^(
+            examples/.*|
+            kcl/.*|
+            \.gitea/.*|
+            VERSIONS\.yaml|
+            CHANGELOG\.md|
+            .pre-commit-config\.yaml|
+            .yamllint\.yaml
+          )$
+
+  # ── Crossplane package build (render test) ───────────────────────────────────
+  # Runs `crossplane xpkg build` for each package directory.
+  # Builds to a temp location and cleans up — acts as a full render+lint pass.
+  # Requires `crossplane` CLI on PATH (https://docs.crossplane.io/latest/cli/).
+  - repo: local
+    hooks:
+      - id: crossplane-validate
+        name: crossplane xpkg build (all packages)
+        language: script
+        entry: scripts/validate-packages.sh
+        pass_filenames: false
+        files: ^package/
+        types: [yaml]

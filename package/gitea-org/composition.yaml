@@ -1,0 +1,171 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xgiteaorgs.platform.wxops.cloud
+  labels:
+    crossplane.io/xrd: xgiteaorgs.platform.wxops.cloud
+spec:
+  compositeTypeRef:
+    apiVersion: platform.wxops.cloud/v1alpha1
+    kind: XGiteaOrg
+
+  mode: Pipeline
+  pipeline:
+    - step: patch-and-transform
+      functionRef:
+        name: function-patch-and-transform
+      input:
+        apiVersion: pt.fn.crossplane.io/v1beta1
+        kind: Resources
+        resources:
+          - name: tf-workspace
+            base:
+              apiVersion: tf.upbound.io/v1beta1
+              kind: Workspace
+              spec:
+                providerConfigRef:
+                  name: default
+                forProvider:
+                  source: Inline
+                  module: |
+                    terraform {
+                      required_providers {
+                        gitea = {
+                          source  = "go-gitea/gitea"
+                          version = "~> 0.7.0"
+                        }
+                      }
+                    }
+
+                    variable "gitea_url" { type = string }
+                    variable "insecure" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "org_name" { type = string }
+                    variable "full_name" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "description" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "website" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "location" {
+                      type    = string
+                      default = ""
+                    }
+                    variable "visibility" {
+                      type    = string
+                      default = "public"
+                    }
+
+                    variable "gitea_token" {
+                      type      = string
+                      sensitive = true
+                    }
+
+                    provider "gitea" {
+                      base_url = var.gitea_url
+                      token    = var.gitea_token
+                      insecure = var.insecure
+                    }
+
+                    resource "gitea_org" "this" {
+                      name        = var.org_name
+                      full_name   = var.full_name
+                      description = var.description
+                      website     = var.website
+                      location    = var.location
+                      visibility  = var.visibility
+                    }
+
+                    output "org_id"   { value = gitea_org.this.id }
+                    output "org_name" { value = gitea_org.this.name }
+
+                  vars:
+                    - key: gitea_url
+                      value: placeholder
+                    - key: org_name
+                      value: placeholder
+                    - key: full_name
+                      value: ""
+                    - key: description
+                      value: ""
+                    - key: website
+                      value: ""
+                    - key: location
+                      value: ""
+                    - key: visibility
+                      value: public
+                    - key: insecure
+                      value: "false"
+
+                  varFiles:
+                    - source: SecretKey
+                      secretKeyRef:
+                        namespace: placeholder
+                        name: placeholder
+                        key: credentials
+
+                writeConnectionSecretToRef:
+                  namespace: crossplane-system
+                  name: placeholder
+
+            patches:
+              - type: FromCompositeFieldPath
+                fromFieldPath: metadata.uid
+                toFieldPath: spec.writeConnectionSecretToRef.name
+                transforms:
+                  - type: string
+                    string:
+                      type: Format
+                      fmt: "tf-gitea-org-%s"
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.giteaUrl
+                toFieldPath: spec.forProvider.vars[0].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.orgName
+                toFieldPath: spec.forProvider.vars[1].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.fullName
+                toFieldPath: spec.forProvider.vars[2].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.description
+                toFieldPath: spec.forProvider.vars[3].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.website
+                toFieldPath: spec.forProvider.vars[4].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.location
+                toFieldPath: spec.forProvider.vars[5].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.visibility
+                toFieldPath: spec.forProvider.vars[6].value
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.insecure
+                toFieldPath: spec.forProvider.vars[7].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.namespace
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.namespace
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.credentialsSecretRef.name
+                toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.name

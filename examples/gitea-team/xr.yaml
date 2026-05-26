@@ -1,0 +1,18 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaTeam
+metadata:
+  name: team-alpha-backend
+spec:
+  parameters:
+    giteaUrl: https://gitea.example.com
+    orgName: team-alpha
+    teamName: backend
+    description: Backend engineers
+    permission: write
+    units: "repo.code,repo.issues,repo.pulls,repo.releases"
+    # Membership is reconciled on every sync.
+    # Add or remove a username here and Crossplane will apply the change.
+    members: "alice,bob"
+    credentialsSecretRef:
+      name: gitea-credentials
+      namespace: crossplane-system

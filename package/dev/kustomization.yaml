@@ -1,0 +1,19 @@
+# Development install — applies XRDs and Compositions directly to the cluster
+# without publishing to a registry first.
+#
+# Usage:
+#   kubectl apply -k package/dev/
+#   kubectl delete -k package/dev/ --ignore-not-found
+#
+# Each entry below points to a DIRECTORY that has its own kustomization.yaml
+# listing only xrd.yaml + composition.yaml. Kustomize treats each as a
+# sub-root, which satisfies LoadRestrictionsRootOnly without needing any flag.
+# (Referencing individual files across directory boundaries is what triggers
+# the load restriction error.)
+apiVersion: kustomize.config.k8s.io/v1beta1
+kind: Kustomization
+resources:
+  - ../gitea-user
+  - ../gitea-org
+  - ../gitea-team
+  - ../gitea-repository

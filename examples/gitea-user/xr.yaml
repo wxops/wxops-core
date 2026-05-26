@@ -1,0 +1,22 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaUser
+metadata:
+  name: example-gitea-user
+spec:
+  parameters:
+    giteaUrl: "https://gitea.example.com"
+    insecure: false
+    username: "alice"
+    email: "alice@example.com"
+    fullName: "Alice"
+    admin: false
+    # mustChangePassword defaults to true — safe to omit.
+    # mustChangePassword: true
+    # passwordLength defaults to 24, passwordSpecial defaults to true.
+    # passwordLength: 24
+    # passwordSpecial: true
+    # visibility defaults to private, which is recommended for user accounts.
+    # visibility: "private"
+    credentialsSecretRef:
+      name: gitea-credentials
+      namespace: crossplane-system
