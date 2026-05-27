@@ -90,7 +90,7 @@ jobs:
           fetch-depth: 0
 
       - name: Install git-cliff
-        run: pip install git-cliff
+        run: pip install git-cliff --break-system-packages
 
       - name: Build release body
         env:
