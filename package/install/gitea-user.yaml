@@ -5,7 +5,7 @@ metadata:
   annotations:
     meta.crossplane.io/version: v0.1.0
 spec:
-  package: ghcr.io/wxops/platform-wxops-gitea-user:v0.1.0
+  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-gitea-user:v0.1.0
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
 
