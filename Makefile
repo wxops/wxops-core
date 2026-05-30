@@ -1,5 +1,4 @@
 REGISTRY ?= ghcr.io/wxops
-VERSION  ?= latest
 
 PACKAGES := gitea-user gitea-org gitea-team gitea-repository
 
