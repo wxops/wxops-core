@@ -31,22 +31,14 @@ for pkg in "${PACKAGES[@]}"; do
     continue
   fi
 
-  curr_ver=$(printf '%s' "$staged_yaml" | python3 -c "
-import yaml, sys
-d = yaml.safe_load(sys.stdin)
-print(d.get('packages', {}).get('${pkg}', {}).get('package', {}).get('current', ''))
-" 2>/dev/null || echo "")
+  curr_ver=$(printf '%s\n' "$staged_yaml" | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | grep "current:" | awk '{print $2}')
 
   # No previous tag means first release — any version is fine
   if [ -z "$last_tag" ]; then
     continue
   fi
 
-  prev_ver=$(git show "${last_tag}:${VERSIONS_FILE}" 2>/dev/null | python3 -c "
-import yaml, sys
-d = yaml.safe_load(sys.stdin)
-print(d.get('packages', {}).get('${pkg}', {}).get('package', {}).get('current', ''))
-" 2>/dev/null || echo "")
+  prev_ver=$(git show "${last_tag}:${VERSIONS_FILE}" 2>/dev/null | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | grep "current:" | awk '{print $2}')
 
   if [ "$curr_ver" = "$prev_ver" ]; then
     FAILED+=("${pkg}  (still ${curr_ver} — same as ${last_tag})")
