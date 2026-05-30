@@ -171,6 +171,9 @@ jobs:
               package/install/${pkg}.yaml
           done
 
+      - name: Regenerate CHANGELOG.md
+        run: pip install git-cliff --break-system-packages && git-cliff -o CHANGELOG.md
+
       - name: Commit and push updated files
         run: |
           git config user.name  "W'xOps Platform Bot"
@@ -178,4 +181,7 @@ jobs:
           git add package/install/
           git diff --staged --quiet || \
             git commit -m "chore: bump package images"
+          git add CHANGELOG.md
+          git diff --staged --quiet || \
+            git commit -m "chore: regenerate changelog"
           git push origin HEAD:main
