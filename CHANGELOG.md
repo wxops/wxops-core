@@ -23,11 +23,34 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 Legend: ✓ = served and storage · (d) = deprecated, served only · — = not defined
 
 ---
+## [Unreleased]
+
+### CI/CD
+
+- **ci**: Add workflow for auto-update changelog.md ([`f9a3e23`](f9a3e23c191c2b8c1aa648d92ae64b2e3162ce8f))
+
+## [0.1.1] — 2026-05-30
+
+### Bug Fixes
+
+- Patch the broken ci by replacing python module instead sed command ([`970625d`](970625d741ba905056a29e6140f9f87d3a2688fe))
+
+
+### CI/CD
+
+- **ci**: Refactor release workflow for bumping version and enhance pre-commit ([`7921ce4`](7921ce4bf6a61ae70e9d416139142e4097046cd3))
+
+
+### Chores
+
+- Remove default version will lead to error release with make ([`8e967a2`](8e967a21d581c0d1d1104e9a48d107056b499dc3))
+- Fix the release bypass pip install git-cliff without python3-venv ([`513d1a9`](513d1a9b2cf39b97181470c9db76ace1ab96d1f9))
+
 ## [0.1.0] — 2026-05-27
 
 ### Chores
 
-- Fix the changelog release and automation write release-notes for new one releasing ([`3d4f926`](3d4f92652d3db595ae00e4c424c54bcfd74f4b28))
+- Fix the changelog release and automation write release-notes for new one releasing ([`a5b54f3`](a5b54f35e92eefb6f468c35866b144bd7254f6d9))
 - Prevent error for running server-side crossplane ([`21b351d`](21b351d90211a407c8bf05c8cb89a71cfdd441d9))
 - Change makefile for finalize the changelog workflow ([`eeca0a7`](eeca0a7f56c6a362042eb583461ee55ca65d4f41))
 - Update and preview changelog and set the release v0.1.0 ([`4d7ffe6`](4d7ffe6c8564846f3cf121f72609de71b90126f6))
@@ -39,5 +62,6 @@ Legend: ✓ = served and storage · (d) = deprecated, served only · — = not d
 - Setup core wxops with kubebuilder to kick-off project ([`8e89719`](8e897194137dfc9cf2ead6d45f86646828b3517c))
 
 ---
+[0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.0...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.1...HEAD
