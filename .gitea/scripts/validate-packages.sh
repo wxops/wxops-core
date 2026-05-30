@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# scripts/validate-packages.sh
+# .gitea/scripts/validate-packages.sh
 #
 # Validates all Crossplane Configuration packages by running
 # `crossplane xpkg build` against each package directory.
@@ -11,7 +11,7 @@
 set -euo pipefail
 
 PACKAGES=(gitea-user gitea-org gitea-team gitea-repository)
-ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR="$(mktemp -d)"
 FAILED=()
 

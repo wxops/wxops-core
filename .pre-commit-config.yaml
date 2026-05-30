@@ -2,8 +2,8 @@
 #
 # Install (run both — they register different git hooks):
 #   pip install pre-commit
-#   pre-commit install                        # registers .git/hooks/pre-commit
-#   pre-commit install --hook-type commit-msg # registers .git/hooks/commit-msg
+#   pre-commit install                         # registers .git/hooks/pre-commit
+#   pre-commit install --hook-type commit-msg  # registers .git/hooks/commit-msg
 #
 # Run all:  pre-commit run --all-files
 # Update:   pre-commit autoupdate
@@ -13,6 +13,7 @@
 #   pre-commit  2. YAML style          (yamllint)
 #               3. Kubernetes schema   (kubeconform)
 #               4. Crossplane build    (crossplane xpkg build)
+#               5. Package version bump (VERSIONS.yaml check)
 #
 # Allowed commit types (must stay in sync with cliff.toml commit_parsers):
 #   feat | fix | perf | refactor | docs | test | chore | revert
@@ -106,7 +107,21 @@ repos:
       - id: crossplane-validate
         name: crossplane xpkg build (all packages)
         language: script
-        entry: scripts/validate-packages.sh
+        entry: .gitea/scripts/validate-packages.sh
         pass_filenames: false
         files: ^package/
         types: [yaml]
+
+  # ── Package version bump enforcement ─────────────────────────────────────────
+  # Ensures VERSIONS.yaml carries a bumped version for every package whose YAML
+  # files are staged. Reads VERSIONS.yaml from the index so the developer can
+  # include the bump in the same commit as the package change.
+  # NOTE: When adding a new package, you can add another after `|` in the regex, e.g: `| postgresql-cluster | redis-cluster | `.
+  - repo: local
+    hooks:
+      - id: versions-bump-check
+        name: ensure VERSIONS.yaml is bumped for changed packages
+        language: script
+        entry: .gitea/scripts/check-versions-bump.sh
+        pass_filenames: false
+        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository)/.*\.yaml$

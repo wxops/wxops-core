@@ -26,7 +26,7 @@ push: build ## Build and push all packages to the registry
 
 .PHONY: validate
 validate: ## Validate all package directories (crossplane xpkg build, no push)
-	@bash scripts/validate-packages.sh
+	@bash .gitea/scripts/validate-packages.sh
 
 .PHONY: clean
 clean: ## Remove local .xpkg build artifacts
@@ -81,29 +81,49 @@ uninstall-dev: ## Remove directly applied XRDs and Compositions
 # ── Changelog ────────────────────────────────────────────────────────────────
 
 .PHONY: changelog
-changelog: ## Prepend unreleased changes to CHANGELOG.md — preserves manual edits (requires git-cliff)
-	git-cliff --unreleased --prepend CHANGELOG.md --strip all
-
-.PHONY: changelog-full
-changelog-full: ## Fully regenerate CHANGELOG.md from scratch — overwrites manual edits
+changelog: ## Regenerate CHANGELOG.md from full git history (requires git-cliff)
+	@which git-cliff > /dev/null || (echo "git-cliff not installed — see https://git-cliff.org/docs/installation" && exit 1)
 	git-cliff -o CHANGELOG.md
 
 .PHONY: changelog-preview
 changelog-preview: ## Preview unreleased changelog without writing
+	@which git-cliff > /dev/null || (echo "git-cliff not installed — see https://git-cliff.org/docs/installation" && exit 1)
 	git-cliff --unreleased --strip all
 
 # ── Release ───────────────────────────────────────────────────────────────────
 
-.PHONY: release
-release: ## Tag and push a release, triggering CI (usage: make release VERSION=v0.2.0)
+.PHONY: release-notes
+release-notes: ## Generate release-notes/<version>.md from template (usage: make release-notes VERSION=v0.2.0)
 	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
-		(echo "error: VERSION must match v<major>.<minor>.<patch>, e.g. make release VERSION=v0.2.0" >&2; exit 1)
-	@git diff --quiet && git diff --cached --quiet || \
-		(echo "error: working tree has uncommitted changes — commit or stash before releasing" >&2; exit 1)
-	@echo "→ tagging $(VERSION)"
-	@git tag $(VERSION)
-	@echo "→ pushing $(VERSION) to origin — CI will build and publish all packages"
-	@git push origin $(VERSION)
+		(echo "error: VERSION must match v<major>.<minor>.<patch>, e.g. make release-notes VERSION=v0.2.0" >&2; exit 1)
+	@bash .gitea/scripts/check-release-notes.sh $(VERSION)
+
+.PHONY: release
+release: ## Tag and push a release — VERSION=vX.Y.Z | BUMP=major|minor|patch | default: auto from commits
+	@if [ -n "$(VERSION)" ]; then \
+		ver="$(VERSION)"; \
+	elif [ -n "$(BUMP)" ]; then \
+		current=$$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"); \
+		maj=$$(echo "$$current" | cut -d. -f1 | tr -d v); \
+		min=$$(echo "$$current" | cut -d. -f2); \
+		pat=$$(echo "$$current" | cut -d. -f3); \
+		case "$(BUMP)" in \
+			major) ver="v$$((maj+1)).0.0" ;; \
+			minor) ver="v$${maj}.$$((min+1)).0" ;; \
+			patch) ver="v$${maj}.$${min}.$$((pat+1))" ;; \
+			*) echo "error: BUMP must be major, minor, or patch" >&2; exit 1 ;; \
+		esac; \
+	else \
+		ver=$$(git-cliff --bumped-version 2>/dev/null); \
+		[ -n "$$ver" ] || { echo "error: git-cliff could not resolve next version — pass VERSION=vX.Y.Z or BUMP=major|minor|patch" >&2; exit 1; }; \
+	fi; \
+	echo "$$ver" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
+		|| { echo "error: '$$ver' is not valid semver (expected vX.Y.Z)" >&2; exit 1; }; \
+	git diff --quiet && git diff --cached --quiet \
+		|| { echo "error: working tree has uncommitted changes — commit or stash before releasing" >&2; exit 1; }; \
+	echo "→ releasing $$ver"; \
+	git tag "$$ver"; \
+	git push origin "$$ver"
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 

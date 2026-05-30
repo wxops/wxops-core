@@ -83,11 +83,10 @@ commit_parsers = [
   { message = "^refactor",          group = "Refactor" },
   { message = "^docs",              group = "Documentation" },
   { message = "^test",              group = "Testing" },
-  { message = "^chore\\(ci\\)",     group = "CI/CD" },
-  { message = "^chore",             group = "Chores" },
-  { message = "^revert",            group = "Reverts" },
-  # Skip bump commits made by CI bot
-  { message = "^chore: bump package images to", skip = true },
+  { message = "^chore\\(ci\\)",                  group = "CI/CD" },
+  { message = "^chore: bump package images", skip = true },
+  { message = "^chore",                         group = "Chores" },
+  { message = "^revert",                        group = "Reverts" },
 ]
 
 # Package-level scopes — these keep per-package history filterable.
