@@ -25,7 +25,7 @@ jobs:
           crossplane version --client
 
       - name: Run package validation
-        run: bash scripts/validate-packages.sh
+        run: bash .gitea/scripts/validate-packages.sh
 
   build-push:
     name: Build and push ${{ matrix.package }}
@@ -44,6 +44,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - name: Install Crossplane CLI
         run: |
@@ -59,7 +61,38 @@ jobs:
           username: ${{ secrets.REGISTRY_USERNAME }}
           password: ${{ secrets.REGISTRY_PASSWORD }}
 
+      - name: Resolve package version from VERSIONS.yaml
+        id: pkg-version
+        env:
+          PKG: ${{ matrix.package }}
+        run: |
+          pkg_ver=$(python3 -c "import yaml,os; d=yaml.safe_load(open('VERSIONS.yaml')); print(d['packages'][os.environ['PKG']]['package']['current'])")
+          echo "value=${pkg_ver}" >> $GITHUB_OUTPUT
+
+      - name: Check if version changed since last release
+        id: changed
+        env:
+          PKG: ${{ matrix.package }}
+          CURR_VER: ${{ steps.pkg-version.outputs.value }}
+        run: |
+          prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          if [ -z "$prev_tag" ]; then
+            echo "→ ${PKG}: no previous tag — building"
+            echo "value=true" >> $GITHUB_OUTPUT
+            exit 0
+          fi
+          prev_ver=$(git show "${prev_tag}:VERSIONS.yaml" | \
+            python3 -c "import yaml,os,sys; d=yaml.safe_load(sys.stdin); print(d.get('packages',{}).get(os.environ['PKG'],{}).get('package',{}).get('current',''))")
+          if [ "$prev_ver" = "$CURR_VER" ]; then
+            echo "→ ${PKG}: unchanged at ${CURR_VER} — skipping"
+            echo "value=false" >> $GITHUB_OUTPUT
+          else
+            echo "→ ${PKG}: ${prev_ver} → ${CURR_VER}"
+            echo "value=true" >> $GITHUB_OUTPUT
+          fi
+
       - name: Build package
+        if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg build \
             -f package/${{ matrix.package }} \
@@ -67,12 +100,14 @@ jobs:
             --ignore kustomization.yaml
 
       - name: Push versioned tag
+        if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
-            ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:${{ github.ref_name }} \
+            ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:${{ steps.pkg-version.outputs.value }} \
             -f platform-wxops-${{ matrix.package }}.xpkg
 
       - name: Push latest tag
+        if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
             ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:latest \
@@ -96,35 +131,23 @@ jobs:
         env:
           VERSION: ${{ github.ref_name }}
         run: |
-          # Generate the changelog section for this tag only
-          git-cliff --current --strip all > /tmp/cliff-section.md
-
-          # Combine custom release notes (if present) with the cliff section
           notes_file="release-notes/${VERSION}.md"
-          if [ -f "$notes_file" ]; then
-            cat "$notes_file" > /tmp/release-body.md
-            echo "" >> /tmp/release-body.md
-            echo "---" >> /tmp/release-body.md
-            echo "" >> /tmp/release-body.md
+          base="${notes_file}"
+          if [ ! -f "$base" ]; then
+            base="release-notes/template.md"
           fi
-          cat /tmp/cliff-section.md >> /tmp/release-body.md
+          { cat "$base"; printf '\n---\n\n'; } > /tmp/release-body.md
+          git-cliff --current --strip all >> /tmp/release-body.md
 
-      - name: Create Gitea release
-        env:
-          VERSION: ${{ github.ref_name }}
-          GITEA_TOKEN: ${{ secrets.REPO_ACCESS_TOKEN }}
-          GITEA_HOST: gitea.xeusnguyen.xyz
-          GITEA_REPO: platform-team/wxops-core
-        run: |
-          body=$(cat /tmp/release-body.md)
-          curl -sS -X POST "https://${GITEA_HOST}/api/v1/repos/${GITEA_REPO}/releases" \
-            -H "Authorization: token ${GITEA_TOKEN}" \
-            -H "Content-Type: application/json" \
-            -d "$(jq -n \
-              --arg tag  "$VERSION" \
-              --arg name "Release ${VERSION}" \
-              --arg body "$body" \
-              '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')"
+      - name: Create release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: ${{ github.ref_name }}
+          name: Release ${{ github.ref_name }}
+          body_path: /tmp/release-body.md
+          draft: false
+          prerelease: false
+          token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
   update-configurations:
     name: Update install manifest versions
@@ -137,32 +160,22 @@ jobs:
         with:
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
 
-      - name: Update spec.package to new version
+      - name: Sync install manifests from VERSIONS.yaml
         env:
-          VERSION: ${{ github.ref_name }}
           REGISTRY: ${{ vars.REGISTRY || 'ghcr.io/wxops' }}
         run: |
           for pkg in gitea-user gitea-org gitea-team gitea-repository; do
+            pkg_ver=$(PKG="$pkg" python3 -c "import yaml,os; d=yaml.safe_load(open('VERSIONS.yaml')); print(d['packages'][os.environ['PKG']]['package']['current'])")
             sed -i \
-              "s|package: .*/platform-wxops-${pkg}:.*|package: ${REGISTRY}/platform-wxops-${pkg}:${VERSION}|" \
+              "s|package: .*/platform-wxops-${pkg}:.*|package: ${REGISTRY}/platform-wxops-${pkg}:${pkg_ver}|" \
               package/install/${pkg}.yaml
-          done
-
-      - name: Update VERSIONS.yaml package versions
-        env:
-          VERSION: ${{ github.ref_name }}
-        run: |
-          for pkg in gitea-user gitea-org gitea-team gitea-repository; do
-            sed -i \
-              "/^  ${pkg}:/,/^  [a-z]/ s|current: .*|current: ${VERSION}|" \
-              VERSIONS.yaml
           done
 
       - name: Commit and push updated files
         run: |
           git config user.name  "W'xOps Platform Bot"
           git config user.email "wxopsbot@wxops.cloud"
-          git add package/install/ VERSIONS.yaml
+          git add package/install/
           git diff --staged --quiet || \
-            git commit -m "chore: bump package images to ${{ github.ref_name }}"
+            git commit -m "chore: bump package images"
           git push origin HEAD:main
