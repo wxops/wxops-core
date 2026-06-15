@@ -19,12 +19,13 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ### CI/CD
 
-- **ci**: Add workflow for auto-update changelog.md ([`9470f73`](9470f73a7ab7fcdd393cad4564f3f1cc8d7fea8a))
+- **ci**: Add configuration for release and bump new version on CI and Make Tools ([`dad65f0`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/dad65f08e8e3cf570a7d67f8739e26095dffee23))
+- **ci**: Add workflow for auto-update changelog.md ([`9470f73`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/9470f73a7ab7fcdd393cad4564f3f1cc8d7fea8a))
 
 
 ### Features
 
-- Release new XRDs for database and application ([`19b835c`](19b835c1664f820ea071210f06641b6ef5a8fd3b))
+- Release new XRDs for database and application ([`19b835c`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/19b835c1664f820ea071210f06641b6ef5a8fd3b))
 
 
 
@@ -41,18 +42,18 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ### Bug Fixes
 
-- Patch the broken ci by replacing python module instead sed command ([`970625d`](970625d741ba905056a29e6140f9f87d3a2688fe))
+- Patch the broken ci by replacing python module instead sed command ([`970625d`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/970625d741ba905056a29e6140f9f87d3a2688fe))
 
 
 ### CI/CD
 
-- **ci**: Refactor release workflow for bumping version and enhance pre-commit ([`7921ce4`](7921ce4bf6a61ae70e9d416139142e4097046cd3))
+- **ci**: Refactor release workflow for bumping version and enhance pre-commit ([`7921ce4`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/7921ce4bf6a61ae70e9d416139142e4097046cd3))
 
 
 ### Chores
 
-- Remove default version will lead to error release with make ([`8e967a2`](8e967a21d581c0d1d1104e9a48d107056b499dc3))
-- Fix the release bypass pip install git-cliff without python3-venv ([`513d1a9`](513d1a9b2cf39b97181470c9db76ace1ab96d1f9))
+- Remove default version will lead to error release with make ([`8e967a2`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/8e967a21d581c0d1d1104e9a48d107056b499dc3))
+- Fix the release bypass pip install git-cliff without python3-venv ([`513d1a9`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/513d1a9b2cf39b97181470c9db76ace1ab96d1f9))
 
 
 
@@ -62,16 +63,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 ### Chores
 
-- Fix the changelog release and automation write release-notes for new one releasing ([`a5b54f3`](a5b54f35e92eefb6f468c35866b144bd7254f6d9))
-- Prevent error for running server-side crossplane ([`21b351d`](21b351d90211a407c8bf05c8cb89a71cfdd441d9))
-- Change makefile for finalize the changelog workflow ([`eeca0a7`](eeca0a7f56c6a362042eb583461ee55ca65d4f41))
-- Update and preview changelog and set the release v0.1.0 ([`4d7ffe6`](4d7ffe6c8564846f3cf121f72609de71b90126f6))
+- Fix the changelog release and automation write release-notes for new one releasing ([`a5b54f3`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/a5b54f35e92eefb6f468c35866b144bd7254f6d9))
+- Prevent error for running server-side crossplane ([`21b351d`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/21b351d90211a407c8bf05c8cb89a71cfdd441d9))
+- Change makefile for finalize the changelog workflow ([`eeca0a7`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/eeca0a7f56c6a362042eb583461ee55ca65d4f41))
+- Update and preview changelog and set the release v0.1.0 ([`4d7ffe6`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/4d7ffe6c8564846f3cf121f72609de71b90126f6))
 
 
 ### Features
 
-- Migrate core from kubebuilder into crossplane for W'xOps Controller Implementation ([`b2990b6`](b2990b6732e73e4cad31795757efdd72e2a061cc))
-- Setup core wxops with kubebuilder to kick-off project ([`8e89719`](8e897194137dfc9cf2ead6d45f86646828b3517c))
+- Migrate core from kubebuilder into crossplane for W'xOps Controller Implementation ([`b2990b6`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/b2990b6732e73e4cad31795757efdd72e2a061cc))
+- Setup core wxops with kubebuilder to kick-off project ([`8e89719`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/8e897194137dfc9cf2ead6d45f86646828b3517c))
 
 
 
