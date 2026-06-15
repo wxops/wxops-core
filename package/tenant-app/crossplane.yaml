@@ -1,0 +1,17 @@
+apiVersion: meta.pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: platform-wxops-tenant-app
+  annotations:
+    meta.crossplane.io/maintainer: W'xOps Platform Team
+    meta.crossplane.io/description: Tenant application scaffold (Deployment, Service, Ingress, optional devSpace) with secretsFrom wiring, cert-manager TLS, and oauth2-proxy SSO.
+    meta.crossplane.io/source: github.com/wxops/wxops-core
+    meta.crossplane.io/license: Apache-2.0
+spec:
+  crossplane:
+    version: ">=v2.3.0-0"
+  dependsOn:
+    - provider: xpkg.upbound.io/crossplane-contrib/provider-kubernetes
+      version: ">=v0.14.1"
+    - function: xpkg.upbound.io/crossplane-contrib/function-kcl
+      version: ">=v0.10.0"

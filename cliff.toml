@@ -20,18 +20,10 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > This file is regenerated from git history by running `make changelog`.
 > Do not edit it manually.
 
----
-
-## XRD API version matrix
-
-| Package | v1alpha1 | v1beta1 | v1 |
-|---|---|---|---|
-| gitea-user | ✓ introduced `v0.1.0` | — | — |
-| gitea-org | ✓ introduced `v0.1.0` | — | — |
-| gitea-team | ✓ introduced `v0.1.0` | — | — |
-| gitea-repository | ✓ introduced `v0.1.0` | — | — |
-
-Legend: ✓ = served and storage · (d) = deprecated, served only · — = not defined
+> Each release below links to a tag-pinned snapshot of [`docs/`](docs/)
+> (API reference) and [`VERSIONS.yaml`](VERSIONS.yaml) as they existed at
+> that tag — not the current `main`. Follow the links in-repo for the
+> latest state.
 
 ---
 """
@@ -49,6 +41,22 @@ body = """
 - {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | upper_first }}{% if commit.breaking %} ⚠️ **BREAKING**{% endif %} ([`{{ commit.id | truncate(length=7, end="") }}`]({{ commit.id }}))
 {% endfor %}
 {% endfor %}
+{% if version %}
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/VERSIONS.yaml)
+{% if previous and previous.version %}\
+{% set cur = version | trim_start_matches(pat="v") | split(pat=".") %}\
+{% set prev = previous.version | trim_start_matches(pat="v") | split(pat=".") %}\
+🔍 [Diff vs {{ previous.version | trim_start_matches(pat="v") }}](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ previous.version }}...{{ version }})
+{% if cur.0 != prev.0 or cur.1 != prev.1 %}
+
+> ⚠️ **API version bump ({{ previous.version | trim_start_matches(pat="v") }} → {{ version | trim_start_matches(pat="v") }})** — major/minor change usually means a new or
+> changed XRD API version (`spec.versions[]`). Check the diff above and
+> [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/VERSIONS.yaml)
+> for affected packages, and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/docs)
+> for schema changes.
+{% endif %}\
+{% endif %}\
+{% endif %}\
 """
 
 footer = """

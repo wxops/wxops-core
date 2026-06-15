@@ -1,0 +1,108 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantApp
+metadata:
+  name: rocket-team-payment-api
+spec:
+  parameters:
+    appName: payment-api
+    namespace: rocket-team-production
+    # environment: dev    # default. one of dev, staging, prod
+    # appFlavor: webapp   # default. one of webapp, ai, ai-webapp, geo-webapp, search-webapp
+    #                      # purely metadata (wxops.cloud/app-flavor label) for platform
+    #                      # automation, e.g. a separate XTenantDatabase claim's extensions
+    # templateId: nodejs-service  # optional. Backstage/IDP template id — catalog metadata only
+    # repository:
+    #   url: https://gitea.example.com/rocket-team/payment-api  # catalog metadata only
+    image:
+      repository: ghcr.io/rocket-team/payment-api
+      tag: "1.4.0"
+
+    # ── Everything below is optional — shown enabled for reference ──────
+    # replicas: 2
+    # containerPort: 8080
+    # resources:
+    #   requests:
+    #     cpu: "100m"
+    #     memory: "128Mi"
+    #   limits:
+    #     cpu: "500m"
+    #     memory: "512Mi"
+    # env:
+    #   - name: LOG_LEVEL
+    #     value: "info"
+    # envFrom:
+    #   - secretRef:
+    #       name: payment-api-extra-secret
+    #   - configMapRef:
+    #       name: payment-api-config
+    # podAnnotations:
+    #   prometheus.io/scrape: "true"
+    #   prometheus.io/port: "8080"
+    # deploymentAnnotations:
+    #   wxops.cloud/owner: rocket-team
+    # labels:
+    #   wxops.cloud/cost-center: rocket-team
+
+    # secretsFrom:
+    #   app:
+    #     enabled: true
+    #     # secretName: payment-api-env       # default: "{appName}-env"
+    #   database:
+    #     enabled: true
+    #     # secretName: payment-api-db-creds  # default: "{appName}-db-creds"
+    # These Secrets are provisioned by the platform/GitOps (ExternalSecret/
+    # PushSecret for app secrets, XTenantDatabase connection-creds for the
+    # database) — this XR only adds envFrom.secretRef entries by name.
+
+    # rolloutStrategy:
+    #   type: RollingUpdate   # default. one of RollingUpdate, Recreate
+    #   rollingUpdate:
+    #     maxSurge: "25%"       # default
+    #     maxUnavailable: "25%" # default
+
+    # reloader:
+    #   enabled: true
+
+    # devSpace:
+    #   enabled: true
+    #   replicas: 0          # default — scale to 1 on-demand
+    #   # image:
+    #   #   repository: ghcr.io/rocket-team/payment-api
+    #   #   tag: debug
+    #   # command: ["sleep", "infinity"]  # default
+
+    # service:
+    #   enabled: true
+    #   type: ClusterIP
+    #   port: 80
+
+    # probes:
+    #   liveness:
+    #     enabled: true       # default: service.enabled
+    #     path: /healthz      # default
+    #   readiness:
+    #     enabled: true       # default: service.enabled
+    #     path: /readyz       # default
+    #   startup:
+    #     enabled: false      # default — opt in for slow-starting apps
+    #     path: /healthz
+    #     periodSeconds: 10
+    #     failureThreshold: 30
+
+    # ingress:
+    #   enabled: true       # host becomes required when enabled
+    #   className: traefik
+    #   host: payment-api.rocket-team.example.com
+    #   path: /             # default
+    #   pathType: Prefix    # default
+    #   tls:
+    #     enabled: true
+    #     secretName: payment-api-tls   # default: "{appName}-tls"
+    #     clusterIssuer: letsencrypt-prod  # optional — auto-issues cert via cert-manager
+    #   auth:
+    #     enabled: true  # SSO via the platform's oauth2-proxy ForwardAuth middlewares
+
+    # Vault-backed env secrets and databases are platform-level concerns,
+    # wired up separately (e.g. an ExternalSecret/PushSecret + XTenantDatabase
+    # claim). Reference the resulting Secret(s) via secretsFrom above, or via
+    # envFrom directly for any other Secret/ConfigMap.

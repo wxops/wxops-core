@@ -1,0 +1,120 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xtenantdatabases.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XTenantDatabase
+    plural: xtenantdatabases
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - dbName
+                    - owner
+                  properties:
+                    tier:
+                      type: string
+                      default: "shared"
+                      description: |
+                        Platform-defined cluster pool to provision this database on.
+                        Maps to a clusterRef/clusterNamespace via a platform-maintained
+                        lookup table (see kcl/tenant-database/main.k). Ignored if
+                        clusterRef/clusterNamespace are set explicitly.
+
+                        Available tiers:
+                          shared — cluster-a / cnpg-system (default, multi-tenant pool).
+                    clusterRef:
+                      type: string
+                      description: |
+                        Name of the platform cluster to provision this database on.
+                        Must match the clusterName of an existing XPlatformDatabaseCluster
+                        (used as spec.cluster.name on the CNPG Database CR, and as the
+                        name of the per-cluster postgresql.sql.crossplane.io
+                        ProviderConfig — created by platform-database-clusters from its
+                        superuser secret — referenced by this tenant's provider-sql
+                        Role).
+
+                        Optional — defaults to the cluster mapped from `tier` if unset.
+                        Set explicitly to override the platform default.
+                    clusterNamespace:
+                      type: string
+                      description: |
+                        Kubernetes namespace where the CNPG cluster lives. All resources
+                        composed by this XR are created here (required for the CNPG
+                        Database CR, which is namespace-scoped to the cluster).
+
+                        Optional — defaults to the namespace mapped from `tier` if unset.
+                        Set explicitly to override the platform default.
+                    dbName:
+                      type: string
+                      description: PostgreSQL database name to create. Must be unique per cluster.
+                    owner:
+                      type: string
+                      description: |
+                        Team or project identifier (e.g. "rocket-team").
+                        Used to scope the Vault path and PostgreSQL role name.
+                    extensions:
+                      type: array
+                      default: []
+                      description: |
+                        PostgreSQL extensions to enable in the database.
+                        Example: [uuid-ossp, pgcrypto, postgis]
+                      items:
+                        type: string
+                    databaseReclaimPolicy:
+                      type: string
+                      default: "retain"
+                      enum: [delete, retain]
+                      description: |
+                        CNPG Database.spec.databaseReclaimPolicy. "retain" (default)
+                        protects this tenant's database from XR/claim deletion: the
+                        database (and its data) and its owning role both survive XR
+                        deletion and must be cleaned up manually if the tenant is
+                        decommissioned.
+
+                        Set to "delete" to have CNPG drop the database when this XR
+                        is deleted, which also allows the owning role to be dropped.
+                        A ClusterUsage (tenant-role-db-usage) orders this: the role's
+                        DROP ROLE is blocked until the database's DROP DATABASE has
+                        completed, then replayed — avoiding the "role ... cannot be
+                        dropped because some objects depend on it" (2BP01) race that
+                        parallel deletion would otherwise cause.
+
+                        Also controls the connection-creds Secret and the
+                        ExternalSecret/Password-generator that manage it:
+                        "retain" orphans them on XR deletion (the existing
+                        password is preserved and reused on recreate — an
+                        admin must delete them manually to force a new
+                        password); "delete" removes them along with everything
+                        else, so recreation generates a brand-new password. A
+                        second ClusterUsage (tenant-conn-role-usage) orders
+                        this: the connection-creds Secret's deletion is
+                        blocked until DROP ROLE has completed, then replayed —
+                        otherwise provider-sql's Observe() (which always reads
+                        the Role's passwordSecretRef, even while deleting)
+                        permanently fails once the Secret is gone, leaving the
+                        Role stuck in Terminating forever.
+                    vaultSecretStoreName:
+                      type: string
+                      default: "vault-cluster-store"
+                      description: |
+                        Name of the ESO ClusterSecretStore used by the PushSecret that
+                        writes connection creds to Vault at
+                        tenant/{owner}/{dbName}/connection-creds. Consuming that Vault
+                        entry into an app namespace (e.g. via an ExternalSecret) is a
+                        tenant/GitOps concern, not handled by this XR.

@@ -40,6 +40,8 @@ jobs:
           - gitea-org
           - gitea-team
           - gitea-repository
+          - platform-database-clusters
+          - tenant-database
 
     steps:
       - name: Checkout
@@ -164,7 +166,7 @@ jobs:
         env:
           REGISTRY: ${{ vars.REGISTRY || 'ghcr.io/wxops' }}
         run: |
-          for pkg in gitea-user gitea-org gitea-team gitea-repository; do
+          for pkg in gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database; do
             pkg_ver=$(sed -n "/^  ${pkg}:/,/^  [a-z]/p" VERSIONS.yaml | grep "current:" | awk '{print $2}')
             sed -i \
               "s|package: .*/platform-wxops-${pkg}:.*|package: ${REGISTRY}/platform-wxops-${pkg}:${pkg_ver}|" \

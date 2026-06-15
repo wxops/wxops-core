@@ -17,3 +17,6 @@ resources:
   - ../gitea-org
   - ../gitea-team
   - ../gitea-repository
+  - ../platform-database-clusters
+  - ../tenant-database
+  - ../tenant-app

@@ -13,3 +13,6 @@ resources:
   - gitea-org.yaml
   - gitea-team.yaml
   - gitea-repository.yaml
+  - platform-database-clusters.yaml
+  - tenant-database.yaml
+  - tenant-app.yaml

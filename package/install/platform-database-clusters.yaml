@@ -1,0 +1,10 @@
+apiVersion: pkg.crossplane.io/v1
+kind: Configuration
+metadata:
+  name: platform-wxops-platform-database-clusters
+  annotations:
+    meta.crossplane.io/version: v0.1.0
+spec:
+  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-platform-database-clusters:v0.1.0
+  packagePullPolicy: IfNotPresent
+  revisionActivationPolicy: Automatic
