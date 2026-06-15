@@ -12,7 +12,7 @@
 
 set -euo pipefail
 
-PACKAGES=(gitea-user gitea-org gitea-team gitea-repository)
+PACKAGES=(gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database tenant-app)
 VERSIONS_FILE="VERSIONS.yaml"
 FAILED=()
 
@@ -31,14 +31,20 @@ for pkg in "${PACKAGES[@]}"; do
     continue
   fi
 
-  curr_ver=$(printf '%s\n' "$staged_yaml" | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | grep "current:" | awk '{print $2}')
+  curr_ver=$(printf '%s\n' "$staged_yaml" | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | { grep "current:" || true; } | awk '{print $2}')
 
   # No previous tag means first release — any version is fine
   if [ -z "$last_tag" ]; then
     continue
   fi
 
-  prev_ver=$(git show "${last_tag}:${VERSIONS_FILE}" 2>/dev/null | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | grep "current:" | awk '{print $2}')
+  prev_ver=$(git show "${last_tag}:${VERSIONS_FILE}" 2>/dev/null | sed -n "/^  ${pkg}:/,/^  [a-z]/p" | { grep "current:" || true; } | awk '{print $2}')
+
+  # Package not present at the previous tag — this is its first release,
+  # any version is fine.
+  if [ -z "$prev_ver" ]; then
+    continue
+  fi
 
   if [ "$curr_ver" = "$prev_ver" ]; then
     FAILED+=("${pkg}  (still ${curr_ver} — same as ${last_tag})")

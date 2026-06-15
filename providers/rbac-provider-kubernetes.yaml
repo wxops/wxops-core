@@ -1,0 +1,65 @@
+# provider-kubernetes runs with `credentials.source: InjectedIdentity` — it
+# acts as its own ServiceAccount. Crossplane's RBAC manager only grants that
+# ServiceAccount permissions on kubernetes.crossplane.io's own CRDs (Object,
+# ProviderConfig, ...) — it does NOT grant permissions on the third-party
+# resources the rendered `manifest:` payloads target. Without this
+# ClusterRole/ClusterRoleBinding, every Object wrapping a CNPG/ESO/provider-sql
+# resource fails with "... is forbidden: User
+# \"system:serviceaccount:crossplane-system:provider-kubernetes-runtime\"
+# cannot get resource ... in API group ...".
+#
+# Bound to the fixed `provider-kubernetes-runtime` ServiceAccount (see
+# runtimeconfig-provider-kubernetes.yaml + provider-kubernetes.yaml's
+# runtimeConfigRef) instead of the package-hash-derived default name — no
+# hash to track, and no group-wide grant that would also reach
+# provider-sql/provider-terraform's ServiceAccounts in crossplane-system.
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: wxops-provider-kubernetes-managed
+rules:
+  # CloudNativePG (platform-database-clusters)
+  - apiGroups: ["postgresql.cnpg.io"]
+    resources: ["clusters", "poolers", "scheduledbackups", "databases"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # External Secrets Operator (platform-database-clusters, tenant-database, tenant-app)
+  - apiGroups: ["external-secrets.io"]
+    resources: ["externalsecrets", "pushsecrets", "clustersecretstores"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["generators.external-secrets.io"]
+    resources: ["passwords"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # provider-sql (platform-database-clusters wraps ProviderConfig, tenant-database wraps Role)
+  - apiGroups: ["postgresql.sql.crossplane.io"]
+    resources: ["providerconfigs", "roles"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # RBAC for ESO's superuser-secret reader (platform-database-clusters)
+  - apiGroups: ["rbac.authorization.k8s.io"]
+    resources: ["roles", "rolebindings"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["serviceaccounts"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # tenant-app workload resources
+  - apiGroups: ["apps"]
+    resources: ["deployments"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: [""]
+    resources: ["services"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["networking.k8s.io"]
+    resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: wxops-provider-kubernetes-managed
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: wxops-provider-kubernetes-managed
+subjects:
+  - kind: ServiceAccount
+    name: provider-kubernetes-runtime
+    namespace: crossplane-system

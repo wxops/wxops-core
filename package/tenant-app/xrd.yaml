@@ -1,0 +1,488 @@
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xtenantapps.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Cluster
+  names:
+    kind: XTenantApp
+    plural: xtenantapps
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              required:
+                - parameters
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - appName
+                    - namespace
+                    - image
+                  properties:
+                    appName:
+                      type: string
+                      description: |
+                        Application name. Used as the name of the Deployment, Service,
+                        and Ingress, and as the value of the
+                        app.kubernetes.io/name and app.kubernetes.io/instance labels.
+                    namespace:
+                      type: string
+                      description: Target namespace for all resources created by this XR.
+                    environment:
+                      type: string
+                      enum: ["dev", "staging", "prod"]
+                      default: "dev"
+                      description: |
+                        Deployment environment. Applied as the
+                        wxops.cloud/environment label on created resources —
+                        purely metadata for dashboards, cost reports, and
+                        Kyverno generate-policies (NetworkPolicy, ResourceQuota,
+                        etc.). Does not affect any default values. Intended to
+                        pair with an ArgoCD ApplicationSet matrix generator
+                        (apps x environments).
+                    appFlavor:
+                      type: string
+                      enum: ["webapp", "ai", "ai-webapp", "geo-webapp", "search-webapp"]
+                      default: "webapp"
+                      description: |
+                        Application flavor. Applied as the wxops.cloud/app-flavor
+                        label on created resources — purely metadata for
+                        platform-level automation (e.g. a separate
+                        XTenantDatabase claim choosing pgvector/postgis
+                        extensions, or Kyverno generate-policies) to key off.
+                        Does not affect any resource composed by this XR.
+                    templateId:
+                      type: string
+                      description: |
+                        Optional Backstage/IDP software-template identifier
+                        this app was scaffolded from. Applied as the
+                        wxops.cloud/template-id annotation on all composed
+                        resources — purely metadata for catalog linking.
+                    repository:
+                      type: object
+                      default: {}
+                      description: |
+                        Metadata about the application's source-code
+                        repository. tenant-app does not create or import
+                        repositories itself — this is just a link recorded
+                        for catalog/portal purposes.
+                      properties:
+                        url:
+                          type: string
+                          description: |
+                            URL of the application's source repository (e.g.
+                            a Gitea repo created or imported by the platform/
+                            portal). Applied as the wxops.cloud/repo-url
+                            annotation on all composed resources.
+
+                    # ── Extra labels/annotations ────────────────────────────
+                    labels:
+                      type: object
+                      default: {}
+                      description: |
+                        Extra labels merged onto all composed resources
+                        (Deployment, devSpace, Service, Ingress). The standard
+                        app.kubernetes.io/* and wxops.cloud/* labels always
+                        take precedence and cannot be overridden, since
+                        selectors depend on them.
+                      additionalProperties:
+                        type: string
+                    deploymentAnnotations:
+                      type: object
+                      default: {}
+                      description: |
+                        Extra annotations merged onto the main Deployment's
+                        metadata.annotations, alongside wxops.cloud/template-id,
+                        wxops.cloud/repo-url, and (if reloader.enabled)
+                        reloader.stakater.com/auto.
+                      additionalProperties:
+                        type: string
+
+                    # ── Container ────────────────────────────────────────────
+                    image:
+                      type: object
+                      required:
+                        - repository
+                      properties:
+                        repository:
+                          type: string
+                          description: Container image repository.
+                        tag:
+                          type: string
+                          default: "latest"
+                        pullPolicy:
+                          type: string
+                          enum: ["Always", "IfNotPresent", "Never"]
+                          default: "IfNotPresent"
+                    replicas:
+                      type: integer
+                      minimum: 0
+                      default: 1
+                    containerPort:
+                      type: integer
+                      default: 8080
+
+                    # ── Rollout strategy ─────────────────────────────────────
+                    rolloutStrategy:
+                      type: object
+                      default: {}
+                      description: |
+                        Deployment.spec.strategy — how Pods are replaced on
+                        update, relevant when replicas > 1.
+                      properties:
+                        type:
+                          type: string
+                          enum: ["RollingUpdate", "Recreate"]
+                          default: "RollingUpdate"
+                        rollingUpdate:
+                          type: object
+                          default: {}
+                          description: Only used when type is RollingUpdate.
+                          properties:
+                            maxSurge:
+                              x-kubernetes-int-or-string: true
+                              default: "25%"
+                            maxUnavailable:
+                              x-kubernetes-int-or-string: true
+                              default: "25%"
+                    resources:
+                      type: object
+                      description: Passed through verbatim to the container's resources field.
+                      properties:
+                        requests:
+                          type: object
+                          properties:
+                            cpu:
+                              type: string
+                            memory:
+                              type: string
+                        limits:
+                          type: object
+                          properties:
+                            cpu:
+                              type: string
+                            memory:
+                              type: string
+                    env:
+                      type: array
+                      default: []
+                      description: Plain (non-secret) environment variables.
+                      items:
+                        type: object
+                        required:
+                          - name
+                          - value
+                        properties:
+                          name:
+                            type: string
+                          value:
+                            type: string
+                    envFrom:
+                      type: array
+                      default: []
+                      description: |
+                        Additional envFrom sources, appended after
+                        secretsFrom.app and secretsFrom.database (if
+                        enabled). Each entry references an existing Secret
+                        or ConfigMap by name.
+                      items:
+                        type: object
+                        properties:
+                          secretRef:
+                            type: object
+                            required:
+                              - name
+                            properties:
+                              name:
+                                type: string
+                          configMapRef:
+                            type: object
+                            required:
+                              - name
+                            properties:
+                              name:
+                                type: string
+                    podAnnotations:
+                      type: object
+                      default: {}
+                      description: Annotations applied to the pod template (e.g. for Prometheus scraping).
+                      additionalProperties:
+                        type: string
+
+                    # ── Secrets (provisioned out-of-band by the platform) ───
+                    secretsFrom:
+                      type: object
+                      default: {}
+                      description: |
+                        Toggles for envFrom.secretRef entries pointing at
+                        Secrets provisioned out-of-band by the platform/
+                        GitOps (an ExternalSecret/PushSecret for app
+                        secrets, an XTenantDatabase's connection-creds for
+                        the database). This XR only wires the reference by
+                        name — it does not provision or wait for the Secret
+                        to exist.
+                      properties:
+                        app:
+                          type: object
+                          default: {}
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                            secretName:
+                              type: string
+                              description: 'Defaults to "{appName}-env" if unset.'
+                        database:
+                          type: object
+                          default: {}
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                            secretName:
+                              type: string
+                              description: 'Defaults to "{appName}-db-creds" if unset.'
+                    command:
+                      type: array
+                      description: Optional container command override.
+                      items:
+                        type: string
+                    args:
+                      type: array
+                      description: Optional container args override.
+                      items:
+                        type: string
+
+                    # ── Reloader (Stakater) ──────────────────────────────────
+                    reloader:
+                      type: object
+                      default: {}
+                      description: |
+                        If enabled, adds reloader.stakater.com/auto: "true"
+                        to the Deployment's annotations so the Stakater
+                        Reloader controller restarts pods when referenced
+                        ConfigMaps/Secrets change. Requires Reloader
+                        (https://github.com/stakater/Reloader) to be
+                        installed in-cluster.
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+
+                    # ── DevSpace (optional debug "twin" Deployment) ─────────
+                    devSpace:
+                      type: object
+                      default: {}
+                      description: |
+                        If enabled, emits a second "<appName>-dev" Deployment
+                        sharing the main Deployment's image, env, and envFrom,
+                        scaled to 0 by default. It has no Service/Ingress of
+                        its own — zero external exposure. Scale it to 1
+                        on-demand and point
+                        Telepresence/Mirrord at deployment/<appName>-dev to
+                        debug with the same environment as production
+                        (see docs/local-dev-tunneling.md).
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        replicas:
+                          type: integer
+                          minimum: 0
+                          default: 0
+                        image:
+                          type: object
+                          description: Optional image override for the dev pod. Defaults to the main image.
+                          properties:
+                            repository:
+                              type: string
+                            tag:
+                              type: string
+                        command:
+                          type: array
+                          default: ["sleep", "infinity"]
+                          description: |
+                            Container command. Defaults to an idle command so
+                            the pod stays up for exec/port-forward without
+                            serving traffic itself.
+                          items:
+                            type: string
+
+                    # ── Service ──────────────────────────────────────────────
+                    service:
+                      type: object
+                      default: {}
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: true
+                        type:
+                          type: string
+                          enum: ["ClusterIP", "NodePort", "LoadBalancer"]
+                          default: "ClusterIP"
+                        port:
+                          type: integer
+                          default: 80
+                          description: Service port. targetPort is always containerPort.
+
+                    # ── Probes ───────────────────────────────────────────────
+                    probes:
+                      type: object
+                      default: {}
+                      description: |
+                        HTTP GET liveness/readiness/startup probes for the
+                        container. liveness and readiness default to enabled
+                        (mirroring service.enabled) against containerPort.
+                      properties:
+                        liveness:
+                          type: object
+                          default: {}
+                          description: 'Default: enabled (= service.enabled), GET /healthz.'
+                          properties:
+                            enabled:
+                              type: boolean
+                              description: Defaults to service.enabled.
+                            path:
+                              type: string
+                              default: "/healthz"
+                            port:
+                              type: integer
+                              description: Defaults to containerPort.
+                            initialDelaySeconds:
+                              type: integer
+                              default: 10
+                            periodSeconds:
+                              type: integer
+                              default: 10
+                            timeoutSeconds:
+                              type: integer
+                              default: 1
+                            failureThreshold:
+                              type: integer
+                              default: 3
+                        readiness:
+                          type: object
+                          default: {}
+                          description: 'Default: enabled (= service.enabled), GET /readyz.'
+                          properties:
+                            enabled:
+                              type: boolean
+                              description: Defaults to service.enabled.
+                            path:
+                              type: string
+                              default: "/readyz"
+                            port:
+                              type: integer
+                              description: Defaults to containerPort.
+                            initialDelaySeconds:
+                              type: integer
+                              default: 5
+                            periodSeconds:
+                              type: integer
+                              default: 10
+                            timeoutSeconds:
+                              type: integer
+                              default: 1
+                            failureThreshold:
+                              type: integer
+                              default: 3
+                        startup:
+                          type: object
+                          default: {}
+                          description: |
+                            Disabled by default. Useful for slow-starting apps —
+                            if enabled, liveness/readiness probes don't start
+                            until this probe succeeds. GET /healthz.
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                            path:
+                              type: string
+                              default: "/healthz"
+                            port:
+                              type: integer
+                              description: Defaults to containerPort.
+                            periodSeconds:
+                              type: integer
+                              default: 10
+                            failureThreshold:
+                              type: integer
+                              default: 30
+
+                    # ── Ingress ──────────────────────────────────────────────
+                    ingress:
+                      type: object
+                      default: {}
+                      description: |
+                        If enabled, host is required (validated by the Composition,
+                        not this schema).
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                        className:
+                          type: string
+                          default: "traefik"
+                        host:
+                          type: string
+                        path:
+                          type: string
+                          default: "/"
+                        pathType:
+                          type: string
+                          enum: ["Prefix", "Exact", "ImplementationSpecific"]
+                          default: "Prefix"
+                        annotations:
+                          type: object
+                          default: {}
+                          additionalProperties:
+                            type: string
+                        tls:
+                          type: object
+                          default: {}
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                            secretName:
+                              type: string
+                              description: 'Defaults to "{appName}-tls" if unset.'
+                            clusterIssuer:
+                              type: string
+                              description: |
+                                If set (and tls.enabled), adds the
+                                cert-manager.io/cluster-issuer annotation so
+                                cert-manager automatically requests a
+                                certificate into tls.secretName via the
+                                named ClusterIssuer. Requires cert-manager
+                                and the named ClusterIssuer to exist
+                                in-cluster. If unset, tls.secretName must be
+                                provisioned by some other means.
+                        auth:
+                          type: object
+                          default: {}
+                          description: |
+                            SSO via Traefik's forward-auth middleware chain
+                            (oauth2-proxy). If enabled, adds the
+                            traefik.ingress.kubernetes.io/router.middlewares
+                            annotation referencing the auth-errors and
+                            forward-auth-redirect Middleware CRDs, so
+                            Traefik runs oauth2-proxy's ForwardAuth check
+                            (and redirects to the login page on 401) before
+                            routing to this app. Both Middleware CRDs are
+                            mirrored into every tenant namespace by the
+                            platform — tenant-app only references them.
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false

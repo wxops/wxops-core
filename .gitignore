@@ -30,3 +30,6 @@ Thumbs.db
 *.secrets
 credentials.yaml
 secrets.yaml
+
+# kcl
+**/kcl.mod.lock

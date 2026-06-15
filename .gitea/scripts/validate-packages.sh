@@ -10,7 +10,7 @@
 
 set -euo pipefail
 
-PACKAGES=(gitea-user gitea-org gitea-team gitea-repository)
+PACKAGES=(gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database)
 ROOT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/../.." && pwd)"
 TMPDIR="$(mktemp -d)"
 FAILED=()

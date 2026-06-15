@@ -1,6 +1,6 @@
 REGISTRY ?= ghcr.io/wxops
 
-PACKAGES := gitea-user gitea-org gitea-team gitea-repository
+PACKAGES := gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database tenant-app
 
 # ── Package build & publish ──────────────────────────────────────────────────
 
@@ -30,6 +30,16 @@ validate: ## Validate all package directories (crossplane xpkg build, no push)
 .PHONY: clean
 clean: ## Remove local .xpkg build artifacts
 	rm -f *.xpkg
+
+# ── KCL source management ────────────────────────────────────────────────────
+
+.PHONY: kcl-sync
+kcl-sync: ## Embed kcl/{pkg}/main.k into composition.yaml (run after editing KCL source)
+	@python3 .gitea/scripts/kcl-sync.py
+
+.PHONY: kcl-check
+kcl-check: ## Fail if any composition.yaml is out of sync with its kcl/ source
+	@python3 .gitea/scripts/kcl-sync.py --check
 
 # ── Lint & render ────────────────────────────────────────────────────────────
 

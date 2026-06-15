@@ -10,10 +10,13 @@ Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native p
 | [`gitea-org`](package/gitea-org/) | `XGiteaOrg` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`gitea-team`](package/gitea-team/) | `XGiteaTeam` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`gitea-repository`](package/gitea-repository/) | `XGiteaRepository` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
+| [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
+| [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
+| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 
 > `random-password` lives in `package/random-password/` as a utility composition but is not yet published as a standalone OCI package.
 
-Current package versions and XRD API version history are tracked in [`VERSIONS.yaml`](VERSIONS.yaml).
+Current package versions and XRD API version history are tracked in [`VERSIONS.yaml`](VERSIONS.yaml). Full `spec.parameters` reference for every XRD lives in [`docs/`](docs/).
 
 ---
 
@@ -26,7 +29,7 @@ The current approach combines two tools with clear roles:
 - **Crossplane** owns the platform API layer: `XRD`s define the schema, `Composition`s wire them to infrastructure, and the control loop reconciles desired state.
 - **Terraform** (via `provider-terraform`) owns the infrastructure execution: each `Workspace` resource runs a plan/apply cycle in-cluster against a Gitea Terraform provider.
 
-Composition functions may be written in Python, Go, CEL, KCL, or Go templating. The `kcl/` directory is reserved for future KCL-based functions.
+Composition functions may be written in Python, Go, CEL, KCL, or Go templating. The `kcl/` directory holds KCL-based composition logic for `platform-database-clusters`, `tenant-database`, and `tenant-app` — see [KCL composition functions](#kcl-composition-functions) below.
 
 ---
 
@@ -55,6 +58,7 @@ package/                      ← Crossplane Configuration packages
                               ← kubectl apply -k package/dev/
   kustomization.yaml          ← delegates to install/ (kubectl apply -k package/)
 providers/                    ← shared Provider + Function installs + ProviderConfig
+docs/                         ← API reference (spec.parameters) per XRD
 examples/                     ← minimal XR YAML to exercise each package
   gitea-user/
     credentials-secret.yaml
@@ -63,7 +67,19 @@ examples/                     ← minimal XR YAML to exercise each package
   gitea-team/xr.yaml
   gitea-repository/xr.yaml
   random-password/xr.yaml
-kcl/                          ← reserved for KCL composition functions
+  platform-database-clusters/xr.yaml
+  tenant-database/xr.yaml
+  tenant-app/xr.yaml
+kcl/                          ← KCL composition functions (source of truth, embedded via kcl-sync)
+  platform-database-clusters/
+    kcl.mod
+    main.k
+  tenant-database/
+    kcl.mod
+    main.k
+  tenant-app/
+    kcl.mod
+    main.k
 .gitea/workflows/
   publish-packages.yaml       ← CI: build + push on v* tag, auto-bump package/install/
 ```
@@ -84,7 +100,7 @@ kcl/                          ← reserved for KCL composition functions
 make providers
 ```
 
-This applies everything in `providers/`: `provider-terraform`, `function-patch-and-transform`, `function-go-templating`, and the `ProviderConfig`.
+This applies everything in `providers/`: `provider-terraform`, `provider-kubernetes` (+ RBAC and `ProviderConfig`), `provider-sql`, `function-patch-and-transform`, `function-go-templating`, `function-kcl`, and the Terraform `ProviderConfig`.
 
 ### 2 — Create a credentials secret
 
@@ -177,6 +193,16 @@ make changelog     Generate CHANGELOG.md from git log (requires git-cliff)
 make clean         Remove .xpkg build artifacts
 make help          Show all targets
 ```
+
+---
+
+## KCL composition functions
+
+`platform-database-clusters`, `tenant-database`, and `tenant-app` use [`function-kcl`](https://github.com/crossplane-contrib/function-kcl) instead of `function-go-templating`, since their Compositions need real branching/looping across multiple optional resources (conditional resource sets, dict merges, list comprehensions over arrays like `managedRoles[]`, and — for `tenant-app` — composing a nested `XTenantDatabase` XR). The other packages (`gitea-*`, `random-password`) are simple enough that inline HCL / Go templating is sufficient.
+
+`kcl/{pkg}/main.k` is the source of truth and is embedded into `package/{pkg}/composition.yaml` via `make kcl-sync` / `make kcl-check`.
+
+See [`kcl/README.md`](kcl/README.md) for why KCL vs Go templating, the sync workflow, how to wire a new KCL module into an XRD, and the deferred OCI-modules migration plan.
 
 ---
 

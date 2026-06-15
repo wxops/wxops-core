@@ -47,6 +47,30 @@ packages:
       storage: v1alpha1
     description: Manages a Gitea repository owned by an organisation.
 
+  platform-database-clusters:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Platform-managed CloudNativePG cluster with pooler and Vault credential seeding.
+
+  tenant-database:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Tenant-facing PostgreSQL database on a platform cluster with Vault-backed credentials and ESO sync.
+
+  tenant-app:
+    package:
+      current: v0.1.0
+    api:
+      served: [v1alpha1]
+      storage: v1alpha1
+    description: Tenant application scaffold (Deployment, Service, Ingress, optional devSpace) with catalog metadata, secretsFrom wiring for platform-provisioned Vault/database secrets, rolloutStrategy, golden-path probes, cert-manager TLS, and oauth2-proxy SSO via Traefik middlewares.
+
 # Utility compositions — not yet published as standalone OCI packages.
 utilities:
 

@@ -112,6 +112,18 @@ repos:
         files: ^package/
         types: [yaml]
 
+  # ── KCL drift check ──────────────────────────────────────────────────────────
+  # Ensures composition.yaml spec.source is in sync with kcl/{pkg}/main.k.
+  # If you edit main.k, run `make kcl-sync` before committing.
+  - repo: local
+    hooks:
+      - id: kcl-drift-check
+        name: kcl source in sync with compositions
+        language: python
+        entry: python3 .gitea/scripts/kcl-sync.py --check
+        pass_filenames: false
+        files: ^(kcl/|package/(platform-database-clusters|tenant-database)/composition\.yaml)
+
   # ── Package version bump enforcement ─────────────────────────────────────────
   # Ensures VERSIONS.yaml carries a bumped version for every package whose YAML
   # files are staged. Reads VERSIONS.yaml from the index so the developer can
@@ -124,4 +136,4 @@ repos:
         language: script
         entry: .gitea/scripts/check-versions-bump.sh
         pass_filenames: false
-        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository)/.*\.yaml$
+        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository|platform-database-clusters|tenant-database)/.*\.yaml$

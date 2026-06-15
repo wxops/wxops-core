@@ -1,0 +1,518 @@
+apiVersion: apiextensions.crossplane.io/v1
+kind: Composition
+metadata:
+  name: xtenantapps.platform.wxops.cloud
+  labels:
+    crossplane.io/xrd: xtenantapps.platform.wxops.cloud
+spec:
+  compositeTypeRef:
+    apiVersion: platform.wxops.cloud/v1alpha1
+    kind: XTenantApp
+
+  mode: Pipeline
+  pipeline:
+    - step: render
+      functionRef:
+        name: function-kcl
+      input:
+        apiVersion: krm.kcl.dev/v1alpha1
+        kind: KCLInput
+        metadata:
+          name: render
+        spec:
+          source: |
+            """
+            XTenantApp — KCL composition source.
+
+            Inputs (via option("params").oxr.spec.parameters):
+              appName     string  Application name. Used for resource names and
+                                   app.kubernetes.io/name|instance labels.
+              namespace   string  Target namespace for all created resources.
+              environment string  One of "dev" (default), "staging", "prod". Applied as
+                                   the wxops.cloud/environment label on created resources
+                                   — purely metadata for dashboards/cost-reports/Kyverno
+                                   generate-policies (NetworkPolicy, ResourceQuota, etc.).
+                                   Does not affect any default values.
+              appFlavor   string  One of "webapp" (default), "ai", "ai-webapp",
+                                   "geo-webapp", "search-webapp". Applied as the
+                                   wxops.cloud/app-flavor label — purely metadata for
+                                   platform-level automation (e.g. a separate
+                                   XTenantDatabase claim choosing pgvector/postgis
+                                   extensions, or Kyverno generate-policies) to key off.
+                                   Does not affect any resource composed here.
+              templateId  string  Optional. Backstage/IDP software-template identifier
+                                   this app was scaffolded from. Applied as the
+                                   wxops.cloud/template-id annotation on all composed
+                                   resources — purely metadata for catalog linking.
+              repository.url string Optional. URL of the application's source-code
+                                   repository (e.g. a Gitea repo created or imported by
+                                   the platform/portal — tenant-app does not create or
+                                   import repositories itself). Applied as the
+                                   wxops.cloud/repo-url annotation on all composed
+                                   resources — purely metadata for catalog linking.
+
+              labels             object  Default: {}. Extra labels merged onto all
+                                   composed resources (Deployment/devSpace/Service/
+                                   Ingress). The standard app.kubernetes.io/* and
+                                   wxops.cloud/* labels always take precedence — they
+                                   cannot be overridden (selectors depend on them).
+              deploymentAnnotations object Default: {}. Extra annotations merged onto
+                                   the main Deployment's metadata.annotations, alongside
+                                   wxops.cloud/template-id, wxops.cloud/repo-url, and
+                                   (if reloader.enabled) reloader.stakater.com/auto.
+
+              image.repository   string  Container image repository.
+              image.tag          string  Image tag. Default: "latest".
+              image.pullPolicy   string  Default: "IfNotPresent".
+              replicas           int     Default: 1.
+              containerPort      int     Default: 8080.
+              resources          object  Passed through to container.resources.
+              env                [object] Plain env vars [{name, value}]. Default: [].
+              envFrom            [object] Additional envFrom sources, each
+                                  {secretRef: {name}} or {configMapRef: {name}}, appended
+                                  after secretsFrom.{app,database} (if enabled).
+                                  Default: [].
+              podAnnotations     object  Annotations applied to the pod template
+                                  (e.g. for Prometheus scraping). Default: {}.
+              command / args     [string] Optional container command/args overrides.
+
+              secretsFrom.app.enabled              bool   Default: false. If true, adds
+                                  secretsFrom.app.secretName to envFrom — the Secret
+                                  that a platform-managed ExternalSecret/PushSecret
+                                  writes app secrets from Vault into. This XR doesn't
+                                  provision or wait for that Secret; GitOps/the platform
+                                  must create it (the Deployment will simply fail to
+                                  start until it exists).
+              secretsFrom.app.secretName           string Default: "{appName}-env".
+              secretsFrom.database.enabled         bool   Default: false. Same as
+                                  secretsFrom.app but for a database connection-creds
+                                  Secret (e.g. produced by a platform-provisioned
+                                  XTenantDatabase).
+              secretsFrom.database.secretName      string Default: "{appName}-db-creds".
+
+              reloader.enabled   bool    Default: false. If true, adds
+                                  reloader.stakater.com/auto: "true" to the
+                                  Deployment's annotations so the Stakater Reloader
+                                  controller (https://github.com/stakater/Reloader)
+                                  restarts pods when referenced ConfigMaps/Secrets
+                                  change. Requires Reloader to be installed in-cluster.
+
+              rolloutStrategy.type                       string Default: "RollingUpdate".
+                                  One of "RollingUpdate" or "Recreate". Sets
+                                  Deployment.spec.strategy — relevant when replicas > 1.
+              rolloutStrategy.rollingUpdate.maxSurge       string|int Default: "25%".
+                                  Only used when type is "RollingUpdate".
+              rolloutStrategy.rollingUpdate.maxUnavailable string|int Default: "25%".
+                                  Only used when type is "RollingUpdate".
+
+              service.enabled    bool    Default: true.
+              service.type       string  Default: "ClusterIP".
+              service.port       int     Default: 80 (targetPort = containerPort).
+
+              probes.liveness.enabled              bool   Default: service.enabled. HTTP GET liveness probe.
+              probes.liveness.path                 string Default: "/healthz".
+              probes.liveness.port                 int    Default: containerPort.
+              probes.liveness.initialDelaySeconds  int    Default: 10.
+              probes.liveness.periodSeconds        int    Default: 10.
+              probes.liveness.timeoutSeconds       int    Default: 1.
+              probes.liveness.failureThreshold     int    Default: 3.
+              probes.readiness.*                   same shape as probes.liveness, path
+                                                    defaults to "/readyz", initialDelaySeconds
+                                                    defaults to 5. Default enabled: service.enabled.
+              probes.startup.enabled               bool   Default: false. If enabled, gates
+                                                    liveness/readiness until the app's first
+                                                    successful health check (for slow-starting
+                                                    apps). HTTP GET, path/port default to
+                                                    "/healthz"/containerPort, periodSeconds
+                                                    default 10, failureThreshold default 30.
+
+              ingress.enabled    bool    Default: false.
+              ingress.className  string  Default: "traefik".
+              ingress.host       string  Required if ingress.enabled.
+              ingress.path       string  Default: "/".
+              ingress.pathType   string  Default: "Prefix".
+              ingress.tls.enabled     bool    Default: false.
+              ingress.tls.secretName  string  Default: "{appName}-tls".
+              ingress.tls.clusterIssuer string Optional. If set (and tls.enabled), adds
+                                  the cert-manager.io/cluster-issuer annotation so
+                                  cert-manager automatically requests a certificate into
+                                  tls.secretName. Requires cert-manager and the named
+                                  ClusterIssuer to exist in-cluster. If unset,
+                                  tls.secretName must be provisioned by some other means.
+              ingress.auth.enabled    bool    Default: false. If true, adds the
+                                  traefik.ingress.kubernetes.io/router.middlewares
+                                  annotation referencing the auth-errors and
+                                  forward-auth-redirect Traefik Middleware CRDs (SSO via
+                                  oauth2-proxy ForwardAuth, with a redirect-to-login on
+                                  401). Requires both Middleware CRDs to exist in this
+                                  app's namespace — the platform mirrors them into every
+                                  tenant namespace (same pattern as other per-tenant
+                                  generated resources); tenant-app only references them.
+              ingress.annotations     object  Default: {}.
+
+              devSpace.enabled    bool    Default: false. If true, emits a second
+                                  "<appName>-dev" Deployment sharing the main
+                                  Deployment's image/env/envFrom, with no Service/
+                                  Ingress of its own (zero external exposure). Intended
+                                  as a target for Telepresence/Mirrord.
+              devSpace.replicas   int     Default: 0. Scale to 1 on-demand to debug.
+              devSpace.image.repository/tag  string  Optional override (defaults to
+                                  the main image).
+              devSpace.command    [string] Default: ["sleep", "infinity"] — keeps the
+                                  pod alive for exec/port-forward without serving traffic.
+
+            Composed resources:
+              app-deployment      apps/v1                       Deployment — app workload.
+              app-dev-deployment  apps/v1                       Deployment — debug twin (if devSpace.enabled).
+              app-service         v1                            Service    — (if service.enabled, default true).
+              app-ingress         networking.k8s.io/v1          Ingress    — (if ingress.enabled).
+
+            This XR deliberately stops at the application workload: Vault-backed secrets
+            (ExternalSecret/PushSecret) and databases (XTenantDatabase) are platform-level
+            concerns wired up separately — apps consume the resulting Secrets via
+            `envFrom`.
+            """
+
+            oxr = option("params").oxr
+            params = oxr.spec.parameters
+
+            # `dict.get(key, default)` does not fall back to `default` for keys that are
+            # declared-but-unset on schema-typed objects from oxr.spec.parameters (it
+            # returns Undefined instead). Use membership checks via this helper instead.
+            _get = lambda d: any, k: str, default: any -> any {
+                d[k] if k in d else default
+            }
+
+            appName = params.appName
+            ns = params.namespace
+            appFlavor = _get(params, "appFlavor", "webapp")
+            environment = _get(params, "environment", "dev")
+
+            # Extra user-supplied labels are merged in first so the standard
+            # app.kubernetes.io/* and wxops.cloud/* labels below always win — selectors
+            # (Deployment.spec.selector, Service.spec.selector) depend on these being
+            # stable and not overridable.
+            _userLabels = _get(params, "labels", {})
+            labels = _userLabels | {
+                "app.kubernetes.io/name" = appName
+                "app.kubernetes.io/instance" = appName
+                "app.kubernetes.io/managed-by" = "crossplane"
+                "wxops.cloud/app-flavor" = appFlavor
+                "wxops.cloud/environment" = environment
+            }
+
+            # templateId / repository.url are pure catalog-linking metadata (e.g. for a
+            # Backstage catalog-info.yaml or portal UI) — applied as annotations on every
+            # composed resource. tenant-app neither creates nor imports repositories;
+            # repository.url just records where the source lives.
+            _templateId = _get(params, "templateId", "")
+            _repo = _get(params, "repository", {})
+            _repoUrl = _get(_repo, "url", "")
+
+            _commonAnnotations = ({"wxops.cloud/template-id" = _templateId} if _templateId != "" else {}) | ({"wxops.cloud/repo-url" = _repoUrl} if _repoUrl != "" else {})
+
+            # ── Container / Deployment ─────────────────────────────────────────
+            _img = params.image
+            containerPort = _get(params, "containerPort", 8080)
+            replicas = _get(params, "replicas", 1)
+
+            _env = params.env if "env" in params else []
+
+            # secretsFrom.{app,database} reference Secrets provisioned out-of-band by the
+            # platform/GitOps (ExternalSecret/PushSecret for Vault app secrets, an
+            # XTenantDatabase's connection-creds for the database) — this XR only wires
+            # them into envFrom by name, on a simple default naming convention. It does
+            # not wait for or validate that these Secrets exist; that's the platform's
+            # responsibility to provision before (or alongside) this XR's resources.
+            _secretsFrom = _get(params, "secretsFrom", {})
+            _appSecret = _secretsFrom.app if "app" in _secretsFrom else {}
+            _dbSecret = _secretsFrom.database if "database" in _secretsFrom else {}
+
+            appSecretEnabled = _get(_appSecret, "enabled", False)
+            appSecretName = _get(_appSecret, "secretName", appName + "-env")
+
+            dbSecretEnabled = _get(_dbSecret, "enabled", False)
+            dbSecretName = _get(_dbSecret, "secretName", appName + "-db-creds")
+
+            # Order: app secret, then database secret, then explicit envFrom — later
+            # entries win on key collisions (Kubernetes envFrom semantics).
+            _envFromManaged = ([{"secretRef" = {"name" = appSecretName}}] if appSecretEnabled else []) + ([{"secretRef" = {"name" = dbSecretName}}] if dbSecretEnabled else [])
+            _envFromExtra = params.envFrom if "envFrom" in params else []
+            _envFrom = _envFromManaged + _envFromExtra
+
+            _podAnnotations = _get(params, "podAnnotations", {})
+
+            _reloader = params.reloader if "reloader" in params else {}
+            reloaderEnabled = _get(_reloader, "enabled", False)
+            _userDeploymentAnnotations = _get(params, "deploymentAnnotations", {})
+            _deploymentAnnotations = _commonAnnotations | _userDeploymentAnnotations | ({"reloader.stakater.com/auto" = "true"} if reloaderEnabled else {})
+
+            _svc = params.service if "service" in params else {}
+            serviceEnabled = _get(_svc, "enabled", True)
+
+            # ── Rollout strategy ──────────────────────────────────────────────
+            # Deployment.spec.strategy — how Pods are replaced on update when
+            # replicas > 1. "RollingUpdate" (default) replaces Pods incrementally
+            # (maxSurge/maxUnavailable control the pace); "Recreate" kills all Pods
+            # before creating new ones (useful for workloads that can't run multiple
+            # versions concurrently, e.g. exclusive DB migrations).
+            _rollout = _get(params, "rolloutStrategy", {})
+            _rolloutType = _get(_rollout, "type", "RollingUpdate")
+            _rollingUpdate = _get(_rollout, "rollingUpdate", {})
+
+            _strategy = {type = _rolloutType} | ({"rollingUpdate" = {
+                maxSurge = _get(_rollingUpdate, "maxSurge", "25%")
+                maxUnavailable = _get(_rollingUpdate, "maxUnavailable", "25%")
+            }} if _rolloutType == "RollingUpdate" else {})
+
+            # Probes default to enabled when the app exposes a Service (i.e. it serves
+            # HTTP, the "webapp" pattern) and target containerPort. startupProbe is
+            # opt-in — it gates liveness/readiness until the first successful check,
+            # useful for slow-starting apps.
+            _probes = _get(params, "probes", {})
+            _liveness = _probes.liveness if "liveness" in _probes else {}
+            _readiness = _probes.readiness if "readiness" in _probes else {}
+            _startup = _probes.startup if "startup" in _probes else {}
+
+            livenessEnabled = _get(_liveness, "enabled", serviceEnabled)
+            readinessEnabled = _get(_readiness, "enabled", serviceEnabled)
+            startupEnabled = _get(_startup, "enabled", False)
+
+            _livenessProbe = {
+                httpGet = {path = _get(_liveness, "path", "/healthz"), port = _get(_liveness, "port", containerPort)}
+                initialDelaySeconds = _get(_liveness, "initialDelaySeconds", 10)
+                periodSeconds = _get(_liveness, "periodSeconds", 10)
+                timeoutSeconds = _get(_liveness, "timeoutSeconds", 1)
+                failureThreshold = _get(_liveness, "failureThreshold", 3)
+            }
+
+            _readinessProbe = {
+                httpGet = {path = _get(_readiness, "path", "/readyz"), port = _get(_readiness, "port", containerPort)}
+                initialDelaySeconds = _get(_readiness, "initialDelaySeconds", 5)
+                periodSeconds = _get(_readiness, "periodSeconds", 10)
+                timeoutSeconds = _get(_readiness, "timeoutSeconds", 1)
+                failureThreshold = _get(_readiness, "failureThreshold", 3)
+            }
+
+            _startupProbe = {
+                httpGet = {path = _get(_startup, "path", "/healthz"), port = _get(_startup, "port", containerPort)}
+                periodSeconds = _get(_startup, "periodSeconds", 10)
+                failureThreshold = _get(_startup, "failureThreshold", 30)
+            }
+
+            _base_container = {
+                name = appName
+                image = "{}:{}".format(_img.repository, _get(_img, "tag", "latest"))
+                imagePullPolicy = _get(_img, "pullPolicy", "IfNotPresent")
+                ports = [{containerPort = containerPort}]
+                env = _env
+            }
+
+            _container_env = _base_container | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {})
+            _container_res = _container_env | ({"resources" = params.resources} if "resources" in params else {})
+            _container_cmd = _container_res | ({"command" = params.command} if "command" in params else {})
+            _container_args = _container_cmd | ({"args" = params.args} if "args" in params else {})
+            _container_liveness = _container_args | ({"livenessProbe" = _livenessProbe} if livenessEnabled else {})
+            _container_readiness = _container_liveness | ({"readinessProbe" = _readinessProbe} if readinessEnabled else {})
+            _container = _container_readiness | ({"startupProbe" = _startupProbe} if startupEnabled else {})
+
+            _deployment = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-deployment"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-deployment"
+                    }
+                }
+                spec = {
+                    providerConfigRef = {name = "default"}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "apps/v1"
+                            kind = "Deployment"
+                            metadata = {
+                                name = appName
+                                namespace = ns
+                                labels = labels
+                                annotations = _deploymentAnnotations
+                            }
+                            spec = {
+                                replicas = replicas
+                                strategy = _strategy
+                                selector = {matchLabels = labels}
+                                template = {
+                                    metadata = {labels = labels, annotations = _podAnnotations}
+                                    spec = {containers = [_container]}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            # ── DevSpace (optional debug "twin" Deployment) ──────────────────────
+            # Scaled to 0 by default — shares image/env/envFrom with the main Deployment,
+            # but has no Service/Ingress of its own (zero external exposure). Scale it up
+            # on-demand and point Telepresence/Mirrord at deployment/<appName>-dev to
+            # mirror traffic and debug with the same environment as production.
+            _devSpace = params.devSpace if "devSpace" in params else {}
+            devSpaceEnabled = _get(_devSpace, "enabled", False)
+            devSpaceReplicas = _get(_devSpace, "replicas", 0)
+            _devImg = _devSpace.image if "image" in _devSpace else {}
+            _devCommand = _get(_devSpace, "command", ["sleep", "infinity"])
+
+            _devLabels = labels | {"app.kubernetes.io/component" = "devspace"}
+
+            _dev_container = {
+                name = appName + "-dev"
+                image = "{}:{}".format(_get(_devImg, "repository", _img.repository), _get(_devImg, "tag", _get(_img, "tag", "latest")))
+                imagePullPolicy = _get(_img, "pullPolicy", "IfNotPresent")
+                ports = [{containerPort = containerPort}]
+                env = _env
+                command = _devCommand
+            } | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {}) | ({"resources" = params.resources} if "resources" in params else {})
+
+            _dev_deployment = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-dev-deployment"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-dev-deployment"
+                    }
+                }
+                spec = {
+                    providerConfigRef = {name = "default"}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "apps/v1"
+                            kind = "Deployment"
+                            metadata = {
+                                name = appName + "-dev"
+                                namespace = ns
+                                labels = _devLabels
+                                annotations = _commonAnnotations
+                            }
+                            spec = {
+                                replicas = devSpaceReplicas
+                                selector = {matchLabels = _devLabels}
+                                template = {
+                                    metadata = {labels = _devLabels}
+                                    spec = {containers = [_dev_container]}
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+
+            # ── Service ─────────────────────────────────────────────────────────
+            servicePort = _get(_svc, "port", 80)
+
+            _service = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-service"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-service"
+                    }
+                }
+                spec = {
+                    providerConfigRef = {name = "default"}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "v1"
+                            kind = "Service"
+                            metadata = {name = appName, namespace = ns, labels = labels, annotations = _commonAnnotations}
+                            spec = {
+                                type = _get(_svc, "type", "ClusterIP")
+                                selector = labels
+                                ports = [{port = servicePort, targetPort = containerPort}]
+                            }
+                        }
+                    }
+                }
+            }
+
+            # ── Ingress ──────────────────────────────────────────────────────────
+            # All field access uses .get() with defaults so this resource can be built
+            # unconditionally — it's only appended to `items` when ingressEnabled.
+            _ing = params.ingress if "ingress" in params else {}
+            ingressEnabled = _get(_ing, "enabled", False)
+            _ingTls = _ing.tls if "tls" in _ing else {}
+
+            # host is required when ingress is enabled — an empty host on an Ingress
+            # rule is a catch-all (matches any incoming Host header), which is never
+            # what's intended here.
+            assert not (ingressEnabled and _get(_ing, "host", "") == ""), "ingress.host is required when ingress.enabled is true"
+
+            _ingress_spec_base = {
+                ingressClassName = _get(_ing, "className", "traefik")
+                rules = [{
+                    host = _get(_ing, "host", "")
+                    http = {
+                        paths = [{
+                            path = _get(_ing, "path", "/")
+                            pathType = _get(_ing, "pathType", "Prefix")
+                            backend = {
+                                service = {
+                                    name = appName
+                                    port = {number = servicePort}
+                                }
+                            }
+                        }]
+                    }
+                }]
+            }
+
+            _ingress_tls_merge = ({"tls" = [{hosts = [_get(_ing, "host", "")], secretName = _get(_ingTls, "secretName", appName + "-tls")}]} if _get(_ingTls, "enabled", False) else {})
+            _ingress_spec = _ingress_spec_base | _ingress_tls_merge
+
+            # cert-manager: when tls.enabled and tls.clusterIssuer is set, add the
+            # cert-manager.io/cluster-issuer annotation so cert-manager automatically
+            # requests a certificate into tls.secretName via an HTTP-01/DNS-01 Challenge.
+            # If clusterIssuer is left unset, tls.secretName must be provisioned by some
+            # other means (e.g. a pre-existing wildcard cert Secret) — tenant-app doesn't
+            # assume a default issuer name since that's cluster-specific.
+            _clusterIssuer = _get(_ingTls, "clusterIssuer", "")
+            _certManagerAnnotations = ({"cert-manager.io/cluster-issuer" = _clusterIssuer} if _get(_ingTls, "enabled", False) and _clusterIssuer != "" else {})
+
+            # SSO: when auth.enabled, attach the auth-errors and forward-auth-redirect
+            # Traefik Middleware CRDs (oauth2-proxy ForwardAuth + redirect-to-login on
+            # 401). These are mirrored into every tenant namespace by the platform —
+            # tenant-app only references them by name (same-namespace, no @namespace
+            # prefix needed).
+            _ingAuth = _ing.auth if "auth" in _ing else {}
+            _authAnnotations = ({"traefik.ingress.kubernetes.io/router.middlewares" = "auth-errors@kubernetescrd,forward-auth-redirect@kubernetescrd"} if _get(_ingAuth, "enabled", False) else {})
+
+            _ingress = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-ingress"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-ingress"
+                    }
+                }
+                spec = {
+                    providerConfigRef = {name = "default"}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "networking.k8s.io/v1"
+                            kind = "Ingress"
+                            metadata = {
+                                name = appName
+                                namespace = ns
+                                labels = labels
+                                annotations = _commonAnnotations | _certManagerAnnotations | _authAnnotations | _get(_ing, "annotations", {})
+                            }
+                            spec = _ingress_spec
+                        }
+                    }
+                }
+            }
+
+            # ── Final resource list ─────────────────────────────────────────────
+            items = [_deployment] + ([_dev_deployment] if devSpaceEnabled else []) + ([_service] if serviceEnabled else []) + ([_ingress] if ingressEnabled else [])
