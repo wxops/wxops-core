@@ -9,26 +9,34 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > This file is regenerated from git history by running `make changelog`.
 > Do not edit it manually.
 
----
-
-## XRD API version matrix
-
-| Package | v1alpha1 | v1beta1 | v1 |
-|---|---|---|---|
-| gitea-user | ✓ introduced `v0.1.0` | — | — |
-| gitea-org | ✓ introduced `v0.1.0` | — | — |
-| gitea-team | ✓ introduced `v0.1.0` | — | — |
-| gitea-repository | ✓ introduced `v0.1.0` | — | — |
-
-Legend: ✓ = served and storage · (d) = deprecated, served only · — = not defined
+> Each release below links to a tag-pinned snapshot of [`docs/`](docs/)
+> (API reference) and [`VERSIONS.yaml`](VERSIONS.yaml) as they existed at
+> that tag — not the current `main`. Follow the links in-repo for the
+> latest state.
 
 ---
-## [Unreleased]
+## [0.2.0] — 2026-06-15
 
 ### CI/CD
 
-- **ci**: Add workflow for auto-update changelog.md ([`f9a3e23`](f9a3e23c191c2b8c1aa648d92ae64b2e3162ce8f))
+- **ci**: Add workflow for auto-update changelog.md ([`9470f73`](9470f73a7ab7fcdd393cad4564f3f1cc8d7fea8a))
 
+
+### Features
+
+- Release new XRDs for database and application ([`19b835c`](19b835c1664f820ea071210f06641b6ef5a8fd3b))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/VERSIONS.yaml)
+🔍 [Diff vs 0.1.1](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.1...v0.2.0)
+
+
+> ⚠️ **API version bump (0.1.1 → 0.2.0)** — major/minor change usually means a new or
+> changed XRD API version (`spec.versions[]`). Check the diff above and
+> [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/VERSIONS.yaml)
+> for affected packages, and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/docs)
+> for schema changes.
 ## [0.1.1] — 2026-05-30
 
 ### Bug Fixes
@@ -46,6 +54,10 @@ Legend: ✓ = served and storage · (d) = deprecated, served only · — = not d
 - Remove default version will lead to error release with make ([`8e967a2`](8e967a21d581c0d1d1104e9a48d107056b499dc3))
 - Fix the release bypass pip install git-cliff without python3-venv ([`513d1a9`](513d1a9b2cf39b97181470c9db76ace1ab96d1f9))
 
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.1/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.1/VERSIONS.yaml)
+🔍 [Diff vs 0.1.0](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.0...v0.1.1)
 ## [0.1.0] — 2026-05-27
 
 ### Chores
@@ -61,7 +73,11 @@ Legend: ✓ = served and storage · (d) = deprecated, served only · — = not d
 - Migrate core from kubebuilder into crossplane for W'xOps Controller Implementation ([`b2990b6`](b2990b6732e73e4cad31795757efdd72e2a061cc))
 - Setup core wxops with kubebuilder to kick-off project ([`8e89719`](8e897194137dfc9cf2ead6d45f86646828b3517c))
 
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.1...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.0...HEAD

@@ -108,7 +108,8 @@ release-notes: ## Generate release-notes/<version>.md from template (usage: make
 	@bash .gitea/scripts/check-release-notes.sh $(VERSION)
 
 .PHONY: release
-release: ## Tag and push a release — VERSION=vX.Y.Z | BUMP=major|minor|patch | default: auto from commits
+release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=major|minor|patch | default: auto from commits
+	@which git-cliff > /dev/null || (echo "git-cliff not installed — see https://git-cliff.org/docs/installation" && exit 1)
 	@if [ -n "$(VERSION)" ]; then \
 		ver="$(VERSION)"; \
 	elif [ -n "$(BUMP)" ]; then \
@@ -130,9 +131,26 @@ release: ## Tag and push a release — VERSION=vX.Y.Z | BUMP=major|minor|patch |
 		|| { echo "error: '$$ver' is not valid semver (expected vX.Y.Z)" >&2; exit 1; }; \
 	git diff --quiet && git diff --cached --quiet \
 		|| { echo "error: working tree has uncommitted changes — commit or stash before releasing" >&2; exit 1; }; \
-	echo "→ releasing $$ver"; \
+	git rev-parse "$$ver" >/dev/null 2>&1 \
+		&& { echo "error: tag $$ver already exists" >&2; exit 1; }; \
+	echo "→ checking CHANGELOG.md for $$ver"; \
+	git-cliff --tag "$$ver" -o CHANGELOG.md; \
+	if git diff --quiet -- CHANGELOG.md; then \
+		echo "→ CHANGELOG.md already up to date for $$ver"; \
+	else \
+		echo "→ CHANGELOG.md updated for $$ver"; \
+		git add CHANGELOG.md; \
+		git commit -m "chore(release): prepare for release $$ver"; \
+	fi; \
+	echo "→ tagging $$ver"; \
 	git tag "$$ver"; \
-	git push origin "$$ver"
+	echo ""; \
+	echo "✓ Release $$ver prepared locally."; \
+	echo "  Review with: git log -2 --stat"; \
+	echo ""; \
+	echo "  Publish when ready:"; \
+	echo "    git push origin main"; \
+	echo "    git push origin $$ver"
 
 # ── Help ─────────────────────────────────────────────────────────────────────
 
