@@ -93,6 +93,7 @@ commit_parsers = [
   { message = "^test",              group = "Testing" },
   { message = "^chore\\(ci\\)",                  group = "CI/CD" },
   { message = "^chore: bump package images", skip = true },
+  { message = "^chore\\(release\\): ",          skip = true },
   { message = "^chore",                         group = "Chores" },
   { message = "^revert",                        group = "Reverts" },
 ]

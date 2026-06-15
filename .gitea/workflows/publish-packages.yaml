@@ -42,6 +42,7 @@ jobs:
           - gitea-repository
           - platform-database-clusters
           - tenant-database
+          - tenant-app
 
     steps:
       - name: Checkout
@@ -84,8 +85,11 @@ jobs:
             exit 0
           fi
           prev_ver=$(git show "${prev_tag}:VERSIONS.yaml" 2>/dev/null | \
-            sed -n "/^  ${PKG}:/,/^  [a-z]/p" | grep "current:" | awk '{print $2}')
-          if [ "$prev_ver" = "$CURR_VER" ]; then
+            sed -n "/^  ${PKG}:/,/^  [a-z]/p" | { grep "current:" || true; } | awk '{print $2}')
+          if [ -z "$prev_ver" ]; then
+            echo "→ ${PKG}: not present at ${prev_tag} — first release, building"
+            echo "value=true" >> $GITHUB_OUTPUT
+          elif [ "$prev_ver" = "$CURR_VER" ]; then
             echo "→ ${PKG}: unchanged at ${CURR_VER} — skipping"
             echo "value=false" >> $GITHUB_OUTPUT
           else
@@ -166,7 +170,7 @@ jobs:
         env:
           REGISTRY: ${{ vars.REGISTRY || 'ghcr.io/wxops' }}
         run: |
-          for pkg in gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database; do
+          for pkg in gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database tenant-app; do
             pkg_ver=$(sed -n "/^  ${pkg}:/,/^  [a-z]/p" VERSIONS.yaml | grep "current:" | awk '{print $2}')
             sed -i \
               "s|package: .*/platform-wxops-${pkg}:.*|package: ${REGISTRY}/platform-wxops-${pkg}:${pkg_ver}|" \
