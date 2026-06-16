@@ -165,6 +165,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          fetch-depth: 0
 
       - name: Sync install manifests from VERSIONS.yaml
         env:
@@ -186,8 +187,8 @@ jobs:
           git config user.email "wxopsbot@wxops.cloud"
           git add package/install/
           git diff --staged --quiet || \
-            git commit -m "chore: bump package images"
+            git commit -m "chore(release): bump package images"
           git add CHANGELOG.md
           git diff --staged --quiet || \
-            git commit -m "chore: regenerate changelog"
+            git commit -m "chore(release): regenerate changelog"
           git push origin HEAD:main
