@@ -145,19 +145,21 @@ can opt in explicitly.
 | `ingress.tls.enabled` | `boolean` | `false` | |
 | `ingress.tls.secretName` | `string` | `"{appName}-tls"` | |
 | `ingress.tls.clusterIssuer` | `string` | | Optional. If set (and `tls.enabled`), adds the `cert-manager.io/cluster-issuer` annotation so cert-manager automatically requests a certificate into `tls.secretName`. Requires [cert-manager](https://cert-manager.io/) and the named `ClusterIssuer` to exist in-cluster. If unset, `tls.secretName` must be provisioned by some other means (e.g. a pre-existing wildcard cert Secret). |
-| `ingress.auth.enabled` | `boolean` | `false` | If true, adds the `traefik.ingress.kubernetes.io/router.middlewares` annotation referencing the `auth-errors` and `forward-auth-redirect` Traefik `Middleware` CRDs — SSO via oauth2-proxy's ForwardAuth, with a redirect to the login page on `401`. See [SSO via oauth2-proxy](#sso-via-oauth2-proxy) below. |
+| `ingress.auth.enabled` | `boolean` | `false` | If true, adds the `traefik.ingress.kubernetes.io/router.middlewares` annotation referencing `kube-system-auth-errors@kubernetescrd` and `kube-system-forward-auth-redirect@kubernetescrd` — SSO via oauth2-proxy's ForwardAuth, with a redirect to the login page on `401`. See [SSO via oauth2-proxy](#sso-via-oauth2-proxy) below. |
 
 #### SSO via oauth2-proxy
 
 When `ingress.auth.enabled: true`, Traefik runs the `auth-errors` and
 `forward-auth-redirect` middlewares before routing to this app — together
 they call oauth2-proxy's ForwardAuth endpoint and redirect unauthenticated
-users (`401`) to the login page. Both `Middleware` CRDs are mirrored into
-every tenant namespace by the platform (same pattern as other per-tenant
-generated resources, e.g. the Kyverno-managed `NetworkPolicy`/`ResourceQuota`
-objects) — `tenant-app` only references them by name and does not provision
-or manage them. Requires oauth2-proxy and these two `Middleware` CRDs to
-exist in this app's namespace.
+users (`401`) to the login page.
+
+Both `Middleware` CRDs are expected to exist in the `kube-system` namespace.
+`tenant-app` references them cross-namespace using the
+`kube-system-<name>@kubernetescrd` convention (e.g.
+`kube-system-auth-errors@kubernetescrd`). This requires Traefik to be
+configured with `--providers.kubernetescrd.allowCrossNamespace=true`.
+`tenant-app` does not provision or manage these `Middleware` CRDs.
 
 ## Vault secrets & databases
 

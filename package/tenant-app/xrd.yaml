@@ -476,12 +476,11 @@ spec:
                             (oauth2-proxy). If enabled, adds the
                             traefik.ingress.kubernetes.io/router.middlewares
                             annotation referencing the auth-errors and
-                            forward-auth-redirect Middleware CRDs, so
-                            Traefik runs oauth2-proxy's ForwardAuth check
-                            (and redirects to the login page on 401) before
-                            routing to this app. Both Middleware CRDs are
-                            mirrored into every tenant namespace by the
-                            platform — tenant-app only references them.
+                            forward-auth-redirect Middleware CRDs in
+                            kube-system (cross-namespace reference via
+                            kube-system-<name>@kubernetescrd). Requires
+                            Traefik to have allowCrossNamespace=true and both
+                            Middleware CRDs to exist in kube-system.
                           properties:
                             enabled:
                               type: boolean
