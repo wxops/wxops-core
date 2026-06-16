@@ -119,12 +119,11 @@ Inputs (via option("params").oxr.spec.parameters):
   ingress.auth.enabled    bool    Default: false. If true, adds the
                       traefik.ingress.kubernetes.io/router.middlewares
                       annotation referencing the auth-errors and
-                      forward-auth-redirect Traefik Middleware CRDs (SSO via
-                      oauth2-proxy ForwardAuth, with a redirect-to-login on
-                      401). Requires both Middleware CRDs to exist in this
-                      app's namespace — the platform mirrors them into every
-                      tenant namespace (same pattern as other per-tenant
-                      generated resources); tenant-app only references them.
+                      forward-auth-redirect Traefik Middleware CRDs living
+                      in kube-system (SSO via oauth2-proxy ForwardAuth, with
+                      a redirect-to-login on 401). Requires Traefik to have
+                      --providers.kubernetescrd.allowCrossNamespace=true and
+                      both Middleware CRDs to exist in kube-system.
   ingress.annotations     object  Default: {}.
 
   devSpace.enabled    bool    Default: false. If true, emits a second
@@ -458,11 +457,11 @@ _certManagerAnnotations = ({"cert-manager.io/cluster-issuer" = _clusterIssuer} i
 
 # SSO: when auth.enabled, attach the auth-errors and forward-auth-redirect
 # Traefik Middleware CRDs (oauth2-proxy ForwardAuth + redirect-to-login on
-# 401). These are mirrored into every tenant namespace by the platform —
-# tenant-app only references them by name (same-namespace, no @namespace
-# prefix needed).
+# 401). Both CRDs live in kube-system and are referenced cross-namespace via
+# the <namespace>-<name>@kubernetescrd convention. Requires Traefik to be
+# started with --providers.kubernetescrd.allowCrossNamespace=true.
 _ingAuth = _ing.auth if "auth" in _ing else {}
-_authAnnotations = ({"traefik.ingress.kubernetes.io/router.middlewares" = "auth-errors@kubernetescrd,forward-auth-redirect@kubernetescrd"} if _get(_ingAuth, "enabled", False) else {})
+_authAnnotations = ({"traefik.ingress.kubernetes.io/router.middlewares" = "kube-system-auth-errors@kubernetescrd,kube-system-forward-auth-redirect@kubernetescrd"} if _get(_ingAuth, "enabled", False) else {})
 
 _ingress = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"

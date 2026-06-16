@@ -29,7 +29,8 @@ Optional, depending on which fields are enabled:
 - [Stakater Reloader](https://github.com/stakater/Reloader) — for
   `reloader.enabled`.
 - oauth2-proxy + the `auth-errors`/`forward-auth-redirect` Traefik
-  `Middleware` CRDs mirrored into the tenant namespace — for
+  `Middleware` CRDs in `kube-system`, and Traefik configured with
+  `--providers.kubernetescrd.allowCrossNamespace=true` — for
   `ingress.auth.enabled`.
 
 ## Install
