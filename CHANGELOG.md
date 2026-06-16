@@ -15,18 +15,22 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
-## [Unreleased]
+## [0.2.1] — 2026-06-16
 
 ### CI/CD
 
-- **ci**: Correct the regenerate changelog and add ignore for git-cliff to see regenerate ([`d81fd6d`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/d81fd6d7bde25d6e4980defd7a5578c251d07737))
+- **ci**: Correct the regenerate changelog and add ignore for git-cliff to see regenerate ([`3286b18`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/3286b18ae9832a5ed4f3e2b5062ab56941aa1674))
 
 
 ### Chores
 
+- Attaching namespace for tenant-app applied SSO ([`c9fbfbd`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/c9fbfbd94b01972384a822c30c4bc8fec0b4a05c))
 - Regenerate changelog ([`106841b`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/106841b89abcef7cd81102f04f4099868b409f49))
 
 
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.1/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.1/VERSIONS.yaml)
+🔍 [Diff vs 0.2.0](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.0...v0.2.1)
 ## [0.2.0] — 2026-06-15
 
 ### CI/CD
@@ -90,8 +94,9 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.1
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.0...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.1...HEAD
 
