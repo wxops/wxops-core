@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.2] — 2026-06-21
+
+### Features
+
+- Dynamic set tier for database and platform database cluster for more usage to intent with shared or dedicated ([`82553f6`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/82553f653007862b44c29418131042252bbc6719))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.2/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.2/VERSIONS.yaml)
+🔍 [Diff vs 0.2.1](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.1...v0.2.2)
 ## [0.2.1] — 2026-06-16
 
 ### CI/CD
@@ -94,9 +104,10 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.2
 [0.2.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.1
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.1...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.2...HEAD
 
