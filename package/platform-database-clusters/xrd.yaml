@@ -293,6 +293,46 @@ spec:
                           superuser:
                             type: boolean
                             default: false
+                          createdb:
+                            type: boolean
+                            default: false
+                            description: Grant CREATEDB privilege.
+                          createrole:
+                            type: boolean
+                            default: false
+                            description: Grant CREATEROLE privilege.
+                          inherit:
+                            type: boolean
+                            default: true
+                            description: |
+                              Inherit privileges of roles this role is a
+                              member of (via inRoles). Default true per
+                              PostgreSQL convention.
+                          replication:
+                            type: boolean
+                            default: false
+                            description: Grant REPLICATION privilege.
+                          bypassrls:
+                            type: boolean
+                            default: false
+                            description: Bypass row-level security policies.
+                          connectionLimit:
+                            type: integer
+                            default: -1
+                            description: |
+                              Max concurrent connections for this role.
+                              -1 = unlimited (default).
+                          inRoles:
+                            type: array
+                            default: []
+                            description: |
+                              Roles this role is a member of. Use for
+                              PostgreSQL predefined roles (pg_read_all_data,
+                              pg_write_all_data, pg_monitor, pg_signal_backend,
+                              etc.) or custom parent roles.
+                              See: https://www.postgresql.org/docs/current/predefined-roles.html
+                            items:
+                              type: string
 
                     # ── Bootstrap / Import ────────────────────────────────────
                     bootstrapFrom:

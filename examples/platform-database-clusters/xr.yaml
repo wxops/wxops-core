@@ -69,7 +69,18 @@ spec:
     # managedRoles:
     #   - name: readonly
     #     login: true
-    #     superuser: false
+    #     inRoles:
+    #       - pg_read_all_data
+    #   - name: monitoring
+    #     login: true
+    #     inRoles:
+    #       - pg_monitor
+    #       - pg_read_all_stats
+    #   - name: app-admin
+    #     login: true
+    #     createdb: true
+    #     createrole: true
+    #     connectionLimit: 10
 
     # Bootstrap mode (default: fresh empty cluster)
     # bootstrapFrom:

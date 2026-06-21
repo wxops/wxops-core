@@ -3,5 +3,5 @@ kind: Function
 metadata:
   name: function-kcl
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.10.0
+  package: xpkg.upbound.io/crossplane-contrib/function-kcl:v0.12.1
   packagePullPolicy: IfNotPresent

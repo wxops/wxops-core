@@ -54,6 +54,8 @@ spec:
     instances: 1
     postgresVersion: 16
     storageSize: "8Gi"
+    shared: true         # enables discovery by XTenantDatabase tier: shared
+    environment: dev     # pool filtered by environment
     vaultPlatformSecretStore: "vault-platform"
 ```
 
@@ -66,6 +68,7 @@ for the complete `spec.parameters` reference.
 ## Relation to other packages
 
 ```
-XPlatformDatabaseCluster (cluster-a)
-└── XTenantDatabase (rocket-team / payment-db)   ← tier: shared, clusterRef: cluster-a
+XPlatformDatabaseCluster (cluster-a, shared: true, environment: dev)
+├── XTenantDatabase (rocket-team / payment-db)   ← tier: shared, auto-assigned
+└── XTenantDatabase (rocket-team / analytics-db) ← tier: dedicated, composes own cluster
 ```

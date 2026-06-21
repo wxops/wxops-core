@@ -3,5 +3,5 @@ kind: Function
 metadata:
   name: function-go-templating
 spec:
-  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.1
+  package: xpkg.upbound.io/crossplane-contrib/function-go-templating:v0.12.2
   packagePullPolicy: IfNotPresent

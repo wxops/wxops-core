@@ -1,6 +1,6 @@
 # W'xOps Core - KCL Module
 
-`platform-database-clusters` and `tenant-database` use [`function-kcl`](https://github.com/crossplane-contrib/function-kcl) instead of `function-go-templating`. The other packages (`gitea-*`, `random-password`) are simple enough that inline HCL / Go templating is sufficient.
+`platform-database-clusters`, `tenant-database`, and `tenant-app` use [`function-kcl`](https://github.com/crossplane-contrib/function-kcl) instead of `function-go-templating`. The other packages (`gitea-*`, `random-password`) are simple enough that inline HCL / Go templating is sufficient.
 
 ## Why KCL instead of Go templating
 
@@ -59,6 +59,7 @@ make kcl-check    # fail if composition.yaml has drifted from kcl/{pkg}/main.k
              source: |
                # contents of kcl/{pkg}/main.k go here (kept in sync via kcl-sync)
    ```
+   If the KCL code reads extra resources (e.g. `tenant-database` discovers shared clusters), add a `function-extra-resources` step **before** the `function-kcl` step — the fetched resources appear in `option("params").extraResources` inside KCL. See `package/tenant-database/composition.yaml` for an example.
 4. **Run `make kcl-sync`** to embed the source, then `make kcl-check` (or `pre-commit run --all-files`) to confirm it's in sync.
 5. **Validate** with `make render` against an example XR in `examples/{pkg}/xr.yaml`, and `make build` to confirm the package still packages cleanly.
 
