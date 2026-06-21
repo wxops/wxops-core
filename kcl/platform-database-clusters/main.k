@@ -8,6 +8,9 @@ Inputs (via option("params").oxr.spec.parameters):
     instances               int      PG instances (1 = standalone, 3 = HA). Default: 1.
     postgresVersion         int      PostgreSQL major version. Default: 16.
     storageSize             string   PVC size per instance. Default: "8Gi".
+    shared                  bool     Mark as shared multi-tenant pool. Default: false.
+                                       Sets wxops.cloud/shared-cluster label for discovery
+                                       by XTenantDatabase's function-extra-resources selector.
     vaultPlatformSecretStore string  ESO ClusterSecretStore for PushSecret. Default: "vault-platform".
                                        NOTE: this store is itself scoped to the "platform/" KV2 path,
                                        so all paths below omit "platform/" (e.g. "database-clusters/...")
@@ -126,6 +129,11 @@ _get = lambda d: any, k: str, default: any -> any {
     d[k] if k in d else default
 }
 
+# ── ArgoCD resource tracking ─────────────────────────────────────────────────
+_oxrLabels = oxr.metadata.labels if "labels" in oxr.metadata else {}
+_argoInstance = _get(_oxrLabels, "app.kubernetes.io/instance", "")
+_argoLabels = {"app.kubernetes.io/instance": _argoInstance} if _argoInstance else {}
+
 # ── Section 1: Core parameters ────────────────────────────────────────────────
 c = params.clusterName
 ns = params.namespace
@@ -133,6 +141,9 @@ instances = _get(params, "instances", 1)
 postgresVersion = _get(params, "postgresVersion", 16)
 storageSize = _get(params, "storageSize", "8Gi")
 platformStore = _get(params, "vaultPlatformSecretStore", "vault-platform")
+
+shared = _get(params, "shared", False)
+environment = _get(params, "environment", "dev")
 
 poolerEnabled = _get(params, "enablePooler", True)
 poolMode = _get(params, "poolMode", "transaction")
@@ -328,7 +339,7 @@ _cnpg_cluster = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
                 kind = "Cluster"
-                metadata = {name = c, namespace = ns}
+                metadata = {name = c, namespace = ns, labels = _argoLabels}
                 spec = _cnpgSpec
             }
         }
@@ -351,7 +362,7 @@ _cnpg_rw_pooler = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
                 kind = "Pooler"
-                metadata = {name = c + "-rw-pooler", namespace = ns}
+                metadata = {name = c + "-rw-pooler", namespace = ns, labels = _argoLabels}
                 spec = {
                     cluster = {name = c}
                     instances = 1
@@ -381,7 +392,7 @@ _cnpg_ro_pooler = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
                 kind = "Pooler"
-                metadata = {name = c + "-ro-pooler", namespace = ns}
+                metadata = {name = c + "-ro-pooler", namespace = ns, labels = _argoLabels}
                 spec = {
                     cluster = {name = c}
                     instances = roPoolerInstances
@@ -411,7 +422,7 @@ _scheduled_backup = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
                 kind = "ScheduledBackup"
-                metadata = {name = c + "-backup", namespace = ns}
+                metadata = {name = c + "-backup", namespace = ns, labels = _argoLabels}
                 spec = {
                     schedule = _bkpSchedule
                     backupOwnerReference = "self"
@@ -457,7 +468,7 @@ _push_secret = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
                 kind = "PushSecret"
-                metadata = {name = c + "-superuser-push", namespace = ns}
+                metadata = {name = c + "-superuser-push", namespace = ns, labels = _argoLabels}
                 spec = {
                     refreshInterval = "1h"
                     deletionPolicy = "Delete"
@@ -491,7 +502,7 @@ _app_push_secret = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
                 kind = "PushSecret"
-                metadata = {name = c + "-app-push", namespace = ns}
+                metadata = {name = c + "-app-push", namespace = ns, labels = _argoLabels}
                 spec = {
                     refreshInterval = "1h"
                     deletionPolicy = "Delete"
@@ -541,7 +552,7 @@ _sql_creds_secret = {
             manifest = {
                 apiVersion = "external-secrets.io/v1"
                 kind = "ExternalSecret"
-                metadata = {name = c + "-app-sql", namespace = ns}
+                metadata = {name = c + "-app-sql", namespace = ns, labels = _argoLabels}
                 spec = {
                     refreshInterval = "1h"
                     secretStoreRef = {name = platformStore, kind = "ClusterSecretStore"}
@@ -580,7 +591,7 @@ _sql_provider_config = {
             manifest = {
                 apiVersion = "postgresql.sql.crossplane.io/v1alpha1"
                 kind = "ProviderConfig"
-                metadata = {name = c}
+                metadata = {name = c, labels = _argoLabels}
                 spec = {
                     credentials = {
                         source = "PostgreSQLConnectionSecret"
@@ -616,7 +627,7 @@ _managed_role_gens = [{
             manifest = {
                 apiVersion = "generators.external-secrets.io/v1alpha1"
                 kind = "Password"
-                metadata = {name = c + "-" + r.name + "-gen", namespace = ns}
+                metadata = {name = c + "-" + r.name + "-gen", namespace = ns, labels = _argoLabels}
                 spec = {
                     length = 32
                     digits = 8
@@ -645,7 +656,7 @@ _managed_role_conn_bundles = [{
             manifest = {
                 apiVersion = "external-secrets.io/v1"
                 kind = "ExternalSecret"
-                metadata = {name = c + "-" + r.name + "-es", namespace = ns}
+                metadata = {name = c + "-" + r.name + "-es", namespace = ns, labels = _argoLabels}
                 spec = {
                     refreshInterval = "0"
                     dataFrom = [{
@@ -692,7 +703,7 @@ _managed_role_push_secrets = [{
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
                 kind = "PushSecret"
-                metadata = {name = c + "-" + r.name + "-push", namespace = ns}
+                metadata = {name = c + "-" + r.name + "-push", namespace = ns, labels = _argoLabels}
                 spec = {
                     refreshInterval = "1h"
                     deletionPolicy = "Delete"
@@ -711,8 +722,30 @@ _managed_role_push_secrets = [{
     }
 } for r in managedRoles]
 
-# ── Section 15: Final resource list ──────────────────────────────────────────
+# ── Section 15: dxr update — shared label + status ──────────────────────────
+# Emitting an item with the XR's own apiVersion/kind updates the XR itself.
+# function-extra-resources in XTenantDatabase selects shared clusters by the
+# wxops.cloud/shared-cluster label, then reads status fields.
+_dxr = {
+    apiVersion = "platform.wxops.cloud/v1alpha1"
+    kind = "XPlatformDatabaseCluster"
+    metadata.labels = ({
+        "wxops.cloud/shared-cluster": "true"
+        "wxops.cloud/environment": environment
+    } if shared else {
+        "wxops.cloud/environment": environment
+    })
+    status = {
+        clusterName = c
+        namespace = ns
+        shared = shared
+        environment = environment
+    }
+}
+
+# ── Section 16: Final resource list ──────────────────────────────────────────
 items = [
+    _dxr
     _cnpg_cluster
     _push_secret
     _app_push_secret

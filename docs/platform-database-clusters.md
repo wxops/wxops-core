@@ -1,6 +1,7 @@
 # XPlatformDatabaseCluster
 
-Platform-managed CloudNativePG cluster with pooler and Vault credential seeding.
+Platform-managed CloudNativePG cluster with pooler, Vault credential seeding,
+and optional shared-cluster labeling for dynamic tenant pool discovery.
 
 | | |
 |---|---|
@@ -29,6 +30,8 @@ Platform-managed CloudNativePG cluster with pooler and Vault credential seeding.
 | `instances` | `integer` (1–9) | | `1` | Number of PostgreSQL instances. `1` = standalone (dev/test), `3` = HA. |
 | `postgresVersion` | `integer` | | `16` | PostgreSQL major version. Maps to the community image `ghcr.io/cloudnative-pg/postgresql:{version}`. |
 | `storageSize` | `string` | | `"8Gi"` | PVC storage size per instance. |
+| `shared` | `boolean` | | `false` | Mark this cluster as available for shared multi-tenant use. When `true`, the composition sets the `wxops.cloud/shared-cluster` label on this XR, allowing `XTenantDatabase` to discover it via `function-extra-resources` label selector for automatic `tier: shared` pool assignment. |
+| `environment` | `string` (`dev`, `staging`, `prod`) | | `"dev"` | Environment this cluster serves. When `shared: true`, `XTenantDatabase` only auto-assigns databases whose `environment` matches — dev databases go to dev clusters, prod to prod. Applied as the `wxops.cloud/environment` label. |
 | `vaultPlatformSecretStore` | `string` | | `"vault-platform"` | ESO `ClusterSecretStore` name used by `PushSecret` to mirror CNPG's own `{clusterName}-superuser` and `{clusterName}-app` secrets to Vault at `database-clusters/{clusterName}/superuser-creds` and `database-clusters/{clusterName}/app-creds`. Each push writes the whole secret in one go (no per-key `property`), so only one Vault KV2 version is created per reconcile. When `enablePooler` is true, pooler-prefixed connection strings (`pooler-host`, `pooler-port`, `pooler-uri`, `pooler-jdbc-uri`, `pooler-pgpass`) are merged into both Vault entries via the PushSecret's `spec.template`. |
 
 ### Pooler (RW)

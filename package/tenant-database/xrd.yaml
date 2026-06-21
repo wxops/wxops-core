@@ -30,36 +30,83 @@ spec:
                     tier:
                       type: string
                       default: "shared"
+                      enum: [shared, dedicated]
                       description: |
-                        Platform-defined cluster pool to provision this database on.
-                        Maps to a clusterRef/clusterNamespace via a platform-maintained
-                        lookup table (see kcl/tenant-database/main.k). Ignored if
-                        clusterRef/clusterNamespace are set explicitly.
+                        shared    — auto-assign to the least-loaded
+                                    XPlatformDatabaseCluster labeled
+                                    shared: true. Prevents dbName collisions
+                                    per cluster.
+                        dedicated — compose a new XPlatformDatabaseCluster as
+                                    a child resource (1 cluster = 1 database,
+                                    fully isolated). Size via dedicatedCluster.
 
-                        Available tiers:
-                          shared — cluster-a / cnpg-system (default, multi-tenant pool).
+                        Ignored if clusterRef/clusterNamespace are set
+                        explicitly.
+                    environment:
+                      type: string
+                      enum: ["dev", "staging", "prod"]
+                      default: "dev"
+                      description: |
+                        Deployment environment. For tier: shared, the pool is
+                        filtered to clusters matching this environment — dev
+                        databases only land on dev clusters, prod on prod.
+                        For tier: dedicated, passed through to the child
+                        cluster's environment field.
+                    dedicatedCluster:
+                      type: object
+                      default: {}
+                      description: |
+                        Cluster sizing parameters when tier is dedicated.
+                        Ignored for tier: shared or when clusterRef is set
+                        explicitly.
+                      properties:
+                        instances:
+                          type: integer
+                          default: 1
+                          minimum: 1
+                          maximum: 9
+                          description: PostgreSQL instances. 1 = standalone, 3 = HA.
+                        storageSize:
+                          type: string
+                          default: "8Gi"
+                          description: PVC storage size per instance.
+                        postgresVersion:
+                          type: integer
+                          default: 16
+                          description: PostgreSQL major version.
+                        enablePooler:
+                          type: boolean
+                          default: true
+                          description: Deploy a PgBouncer RW pooler on the dedicated cluster.
+                        namespace:
+                          type: string
+                          description: |
+                            Namespace for the dedicated cluster. Defaults to
+                            cnpg-system if unset.
                     clusterRef:
                       type: string
                       description: |
                         Name of the platform cluster to provision this database on.
-                        Must match the clusterName of an existing XPlatformDatabaseCluster
-                        (used as spec.cluster.name on the CNPG Database CR, and as the
-                        name of the per-cluster postgresql.sql.crossplane.io
-                        ProviderConfig — created by platform-database-clusters from its
-                        superuser secret — referenced by this tenant's provider-sql
-                        Role).
+                        Must match the clusterName of an existing
+                        XPlatformDatabaseCluster (used as spec.cluster.name on
+                        the CNPG Database CR, and as the name of the per-cluster
+                        provider-sql ProviderConfig created by
+                        platform-database-clusters).
 
-                        Optional — defaults to the cluster mapped from `tier` if unset.
-                        Set explicitly to override the platform default.
+                        Optional — when unset, resolved automatically from
+                        tier (shared: least-loaded pool cluster; dedicated:
+                        composed child cluster). Set explicitly to bypass all
+                        tier logic.
                     clusterNamespace:
                       type: string
                       description: |
-                        Kubernetes namespace where the CNPG cluster lives. All resources
-                        composed by this XR are created here (required for the CNPG
-                        Database CR, which is namespace-scoped to the cluster).
+                        Kubernetes namespace where the CNPG cluster lives. All
+                        resources composed by this XR are created here.
 
-                        Optional — defaults to the namespace mapped from `tier` if unset.
-                        Set explicitly to override the platform default.
+                        Optional — when unset, resolved automatically from
+                        tier (shared: from the selected pool cluster's status;
+                        dedicated: from dedicatedCluster.namespace or
+                        cnpg-system). Set explicitly to bypass tier logic.
                     dbName:
                       type: string
                       description: PostgreSQL database name to create. Must be unique per cluster.
@@ -113,8 +160,29 @@ spec:
                       type: string
                       default: "vault-cluster-store"
                       description: |
-                        Name of the ESO ClusterSecretStore used by the PushSecret that
-                        writes connection creds to Vault at
-                        tenant/{owner}/{dbName}/connection-creds. Consuming that Vault
-                        entry into an app namespace (e.g. via an ExternalSecret) is a
-                        tenant/GitOps concern, not handled by this XR.
+                        Name of the ESO ClusterSecretStore used by the PushSecret
+                        that writes connection creds to Vault at
+                        tenants/{owner}/databases/{dbName}/connection-creds.
+                        Consuming that Vault entry into an app namespace (e.g.
+                        via an ExternalSecret) is a tenant/GitOps concern, not
+                        handled by this XR.
+            status:
+              type: object
+              properties:
+                clusterRef:
+                  type: string
+                  description: |
+                    Resolved CNPG cluster name this database is provisioned on.
+                    Written by the composition on first assignment and reused on
+                    subsequent reconciles (sticky). Other XTenantDatabase XRs
+                    read this field (via function-extra-resources) to count
+                    databases per cluster for load-balanced pool assignment.
+                clusterNamespace:
+                  type: string
+                  description: Namespace of the resolved cluster.
+                tier:
+                  type: string
+                  description: Resolved tier (shared, dedicated, or explicit).
+                dbName:
+                  type: string
+                  description: PostgreSQL database name (echoed for cross-XR collision checks).

@@ -4,9 +4,11 @@ metadata:
   name: rocket-team-payment-db
 spec:
   parameters:
-    # tier: shared   # default — maps to clusterRef: cluster-a, clusterNamespace: cnpg-system
-    # clusterRef: cluster-a          # optional override
-    # clusterNamespace: cnpg-system  # optional override
+    # tier: shared     # default — auto-assigns to the least-loaded shared cluster
+    # tier: dedicated  # composes a child XPlatformDatabaseCluster (1 cluster = 1 db)
+    environment: dev   # pool filtered by environment — must match cluster's environment
+    # clusterRef: cluster-a          # explicit override — bypasses tier logic
+    # clusterNamespace: cnpg-system  # explicit override — bypasses tier logic
     dbName: payment-db
     owner: rocket-team
     extensions:

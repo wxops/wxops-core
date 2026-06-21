@@ -9,6 +9,8 @@ spec:
     instances: 1
     postgresVersion: 16
     storageSize: "8Gi"
+    shared: true       # enables discovery by XTenantDatabase tier: shared
+    environment: dev   # pool is filtered by environment — dev DBs go to dev clusters
     vaultPlatformSecretStore: "vault-platform"
 
     # RW pooler (default: enabled)
