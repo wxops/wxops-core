@@ -11,6 +11,31 @@ spec:
 
   mode: Pipeline
   pipeline:
+    - step: fetch-resources
+      functionRef:
+        name: function-extra-resources
+      input:
+        apiVersion: extra-resources.fn.crossplane.io/v1beta1
+        kind: Input
+        spec:
+          extraResources:
+            - kind: XPlatformDatabaseCluster
+              into: sharedClusters
+              apiVersion: platform.wxops.cloud/v1alpha1
+              type: Selector
+              selector:
+                matchLabels:
+                  - key: wxops.cloud/shared-cluster
+                    type: Value
+                    value: "true"
+            - kind: XTenantDatabase
+              into: existingDatabases
+              apiVersion: platform.wxops.cloud/v1alpha1
+              type: Selector
+              selector:
+                maxMatch: 500
+                minMatch: 0
+
     - step: render
       functionRef:
         name: function-kcl
@@ -25,18 +50,26 @@ spec:
             XTenantDatabase — KCL composition source.
 
             Inputs (via option("params").oxr.spec.parameters):
-              tier                string    Platform-defined cluster pool to provision on. One of
-                                             the keys of _clusterTierMap below (currently: "shared").
-                                             Default: "shared". Ignored if clusterRef/clusterNamespace
-                                             are set explicitly.
+              tier                string    "shared" (default) or "dedicated". Ignored if
+                                             clusterRef/clusterNamespace are set explicitly.
+                                             shared    — auto-assign to the least-loaded
+                                                         XPlatformDatabaseCluster labeled
+                                                         shared: true (discovered at render
+                                                         time via function-extra-resources).
+                                             dedicated — compose a child XPlatformDatabaseCluster
+                                                         (1 cluster = 1 database, isolated).
+              dedicatedCluster    object    Cluster sizing for tier: dedicated. Ignored otherwise.
+                                             instances, storageSize, postgresVersion, enablePooler,
+                                             namespace.
               clusterRef          string    CNPG cluster name (XPlatformDatabaseCluster.clusterName).
                                              Used as spec.cluster.name on the CNPG Database CR and as
                                              the name of the per-cluster provider-sql ProviderConfig
                                              (created by platform-database-clusters) referenced by the Role below.
-                                             Defaults to the cluster mapped from `tier` if unset.
+                                             When set, bypasses all tier logic.
               clusterNamespace    string    Namespace where the CNPG cluster (and all resources
-                                             composed by this XR) live. Defaults to the namespace
-                                             mapped from `tier` if unset.
+                                             composed by this XR) live. When unset, resolved from
+                                             tier (shared: pool cluster status; dedicated:
+                                             dedicatedCluster.namespace or cnpg-system).
               dbName              string    PostgreSQL database name to create.
               owner               string    Team/project identifier (e.g. "rocket-team"). Scopes role name + Vault path.
               extensions          [string]  PostgreSQL extensions to enable. Default: [].
@@ -80,7 +113,7 @@ spec:
               - PushSecret syncs the connection bundle to Vault once (refreshInterval:
                 "0" — the password never changes after creation under CreatedOnce, so
                 there's nothing to re-push periodically; spec changes still trigger a
-                re-sync). Consuming the Vault entry (tenant/{owner}/{dbName}/connection-creds)
+                re-sync). Consuming the Vault entry (tenants/{owner}/databases/{dbName}/connection-creds)
                 into an app namespace is intentionally NOT done here — that's a
                 tenant/GitOps concern (e.g. tenant-app's externalSecrets toggle), keeping
                 this package focused on provisioning the role/database/credentials only.
@@ -98,8 +131,9 @@ spec:
               tenant-sql-role      postgresql.sql.crossplane.io/v1alpha1     Role           — per-tenant role + password (provider-sql).
               cnpg-database        postgresql.cnpg.io/v1                     Database       — PostgreSQL database + extensions.
               tenant-push-secret   external-secrets.io/v1alpha1             PushSecret     — pushes bundle to Vault (once).
+              dedicated-cluster    platform.wxops.cloud/v1alpha1            XPlatformDatabaseCluster — only when tier: dedicated.
 
-            Vault path written: tenant/{owner}/{dbName}/connection-creds
+            Vault path written: tenants/{owner}/databases/{dbName}/connection-creds
             """
 
             oxr = option("params").oxr
@@ -107,29 +141,130 @@ spec:
             uid = oxr.metadata.uid
             short = uid[:8:]
 
-            # Platform-defined cluster pools — extend this map as new tiers/clusters
-            # come online. clusterRef/clusterNamespace, if set explicitly, always win.
-            _clusterTierMap = {
-                "shared" = {clusterRef = "cluster-a", clusterNamespace = "cnpg-system"}
+            _get = lambda d: any, k: str, default: any -> any {
+                d[k] if k in d else default
             }
 
-            tier = params.tier if "tier" in params else "shared"
-            _tierDefaults = _clusterTierMap[tier]
+            # ── ArgoCD resource tracking ─────────────────────────────────────────────────
+            # When ArgoCD applies the XR from Git, it sets app.kubernetes.io/instance on
+            # the XR to the Application name. Propagate this to composed Object CRs so
+            # ArgoCD discovers the full resource tree in its UI. If the XR wasn't applied
+            # by ArgoCD (e.g. kubectl apply), the label is absent and nothing happens.
+            _oxrLabels = oxr.metadata.labels if "labels" in oxr.metadata else {}
+            _argoInstance = _get(_oxrLabels, "app.kubernetes.io/instance", "")
+            _argoLabels = {"app.kubernetes.io/instance": _argoInstance} if _argoInstance else {}
 
-            clusterRef = params.clusterRef if "clusterRef" in params else _tierDefaults.clusterRef
-            clusterNs = params.clusterNamespace if "clusterNamespace" in params else _tierDefaults.clusterNamespace
+            # ── Tier resolution — dynamic discovery via function-extra-resources ──────────
+            # function-extra-resources (pipeline step before this one) fetches:
+            #   sharedClusters    — all XPlatformDatabaseCluster XRs with wxops.cloud/shared-cluster: "true"
+            #   existingDatabases — all XTenantDatabase XRs (for per-cluster tenant count + collision checks)
+            _extraResources = option("params").extraResources or {}
+            _sharedClusters = [r.resource for r in (_extraResources.sharedClusters or [])]
+            _existingDbs = [r.resource for r in (_extraResources.existingDatabases or [])]
+
             dbName = params.dbName
             owner = params.owner
-            extensions = params.extensions if "extensions" in params else []
-            databaseReclaimPolicy = params.databaseReclaimPolicy if "databaseReclaimPolicy" in params else "retain"
-            vaultStore = params.vaultSecretStoreName if "vaultSecretStoreName" in params else "vault-cluster-store"
+            tier = _get(params, "tier", "shared")
+            environment = _get(params, "environment", "dev")
+            _hasExplicitCluster = "clusterRef" in params and "clusterNamespace" in params
+
+            # ── Helper: get resolved clusterRef from a peer XTenantDatabase XR ───────────
+            # Priority: status.clusterRef (set by composition) > spec.parameters.clusterRef (explicit).
+            _peerCluster = lambda db: any -> str {
+                _dbStatus = db.status if "status" in db else {}
+                _statusRef = _get(_dbStatus, "clusterRef", "")
+                _specRef = _get(db.spec.parameters, "clusterRef", "") if "spec" in db and "parameters" in db.spec else ""
+                _statusRef if _statusRef else _specRef
+            }
+
+            # ── Stickiness: reuse previous assignment if already resolved ────────────────
+            # On first render, status is empty — the pool selection runs and assigns a
+            # cluster. On subsequent renders, status.clusterRef is set — reuse it to
+            # prevent re-balancing on every reconcile (adding a new empty cluster shouldn't
+            # cause existing databases to migrate).
+            _oxrStatus = oxr.status if "status" in oxr else {}
+            _stickyCluster = _get(_oxrStatus, "clusterRef", "")
+            _stickyNs = _get(_oxrStatus, "clusterNamespace", "")
+            _hasSticky = bool(_stickyCluster) and bool(_stickyNs) and not _hasExplicitCluster and tier == "shared"
+
+            # ── tier: shared — pool-based auto-assignment ────────────────────────────────
+            # Only runs on FIRST assignment (_hasSticky is false). After that, the sticky
+            # assignment from status is reused.
+            #
+            # Strategy:
+            # 1. Build pool from shared cluster XRs' status — filtered by environment.
+            # 2. Count existing tenant databases per cluster via STATUS.clusterRef
+            #    (not spec.parameters.clusterRef — auto-assigned databases don't have that).
+            # 3. Pick the cluster with the fewest tenants (least-loaded).
+
+            _sharedPool = [{
+                clusterName = sc.status.clusterName
+                namespace = sc.status.namespace
+            } for sc in _sharedClusters \
+                if "status" in sc and "clusterName" in sc.status \
+                and _get(sc.status, "environment", "dev") == environment]
+
+            _dbCountByCluster = lambda clusterName: str -> int {
+                len([
+                    db for db in _existingDbs
+                    if _peerCluster(db) == clusterName and db.metadata.uid != uid
+                ])
+            }
+
+            _poolWithCounts = [{
+                clusterName = sc.clusterName
+                namespace = sc.namespace
+                count = _dbCountByCluster(sc.clusterName)
+            } for sc in _sharedPool]
+
+            _minCount = min([sc.count for sc in _poolWithCounts]) if _poolWithCounts else 0
+            _selectedShared = [sc for sc in _poolWithCounts if sc.count == _minCount][0] \
+                if _poolWithCounts else None
+
+            # ── tier: dedicated — compose a child XPlatformDatabaseCluster ───────────────
+            _isDedicated = tier == "dedicated" and not _hasExplicitCluster
+            _dedCfg = _get(params, "dedicatedCluster", {})
+            _dedClusterName = owner + "-" + dbName + "-cluster"
+            _dedNs = _get(_dedCfg, "namespace", "cnpg-system")
+
+            # ── Resolve final clusterRef + clusterNamespace ──────────────────────────────
+            _needsPoolSelection = not _hasExplicitCluster and not _isDedicated and not _hasSticky
+            assert not _needsPoolSelection or _selectedShared, \
+                "tier: shared requires at least one XPlatformDatabaseCluster with shared: true and environment: ${environment}"
+
+            clusterRef = params.clusterRef if _hasExplicitCluster \
+                else _dedClusterName if _isDedicated \
+                else _stickyCluster if _hasSticky \
+                else _selectedShared.clusterName
+            clusterNs = params.clusterNamespace if _hasExplicitCluster \
+                else _dedNs if _isDedicated \
+                else _stickyNs if _hasSticky \
+                else _selectedShared.namespace
+
+            # ── dbName collision check — enforced for ALL tiers ──────────────────────────
+            # PostgreSQL database names are unique per cluster. This check catches:
+            # - Same dbName from different owners on the same cluster (CNPG would fail)
+            # - Same owner + same dbName = identical roleName, Secrets, Vault path (full collision)
+            _dbNameCollisions = [
+                db for db in _existingDbs
+                if "spec" in db and "parameters" in db.spec \
+                   and _get(db.spec.parameters, "dbName", "") == dbName \
+                   and _peerCluster(db) == clusterRef \
+                   and db.metadata.uid != uid
+            ]
+            assert not _dbNameCollisions, \
+                "dbName '${dbName}' already exists on cluster '${clusterRef}'"
+
+            extensions = _get(params, "extensions", [])
+            databaseReclaimPolicy = _get(params, "databaseReclaimPolicy", "retain")
+            vaultStore = _get(params, "vaultSecretStoreName", "vault-cluster-store")
 
             # Resource names — all derived from owner + dbName for human readability and
             # uniqueness within a shared clusterNamespace.
             roleName = owner + "-" + dbName
             pwdGenName = roleName + "-pwd-gen"
             connSecretName = roleName + "-connection-creds"
-            vaultPath = owner + "/" + dbName + "/connection-creds"
+            vaultPath = owner + "/databases/" + dbName + "/connection-creds"
             endpoint = clusterRef + "-rw." + clusterNs + ".svc.cluster.local"
             connStr = "postgresql://" + roleName + ":{{ .password }}@" + endpoint + ":5432/" + dbName
 
@@ -199,7 +334,7 @@ spec:
                         manifest = {
                             apiVersion = "generators.external-secrets.io/v1alpha1"
                             kind = "Password"
-                            metadata = {name = pwdGenName, namespace = clusterNs}
+                            metadata = {name = pwdGenName, namespace = clusterNs, labels = _argoLabels}
                             spec = {
                                 length = 32
                                 digits = 8
@@ -234,7 +369,7 @@ spec:
                         manifest = {
                             apiVersion = "external-secrets.io/v1"
                             kind = "ExternalSecret"
-                            metadata = {name = roleName + "-conn-es", namespace = clusterNs}
+                            metadata = {name = roleName + "-conn-es", namespace = clusterNs, labels = _argoLabels}
                             spec = {
                                 refreshInterval = esoRefreshInterval
                                 refreshPolicy = esoRefreshPolicy
@@ -312,7 +447,7 @@ spec:
                         manifest = {
                             apiVersion = "postgresql.sql.crossplane.io/v1alpha1"
                             kind = "Role"
-                            metadata = {name = roleName}
+                            metadata = {name = roleName, labels = _argoLabels}
                             spec = {
                                 deletionPolicy = _roleDeletionPolicy
                                 providerConfigRef = {name = clusterRef}
@@ -363,7 +498,7 @@ spec:
                         manifest = {
                             apiVersion = "postgresql.cnpg.io/v1"
                             kind = "Database"
-                            metadata = {name = roleName, namespace = clusterNs}
+                            metadata = {name = roleName, namespace = clusterNs, labels = _argoLabels}
                             spec = _dbSpec
                         }
                     }
@@ -451,7 +586,7 @@ spec:
             }
 
             # ── ESO PushSecret: push connection bundle to Vault ────────────────
-            # Vault path: tenant/{owner}/{dbName}/connection-creds
+            # Vault path: tenants/{owner}/databases/{dbName}/connection-creds
             # Pushes the WHOLE {connSecretName} secret (username, password, endpoint,
             # port, database, connectionString — all built via _conn_bundle's template
             # above) as a single write per reconcile (data[] entry has no
@@ -488,7 +623,7 @@ spec:
                         manifest = {
                             apiVersion = "external-secrets.io/v1alpha1"
                             kind = "PushSecret"
-                            metadata = {name = roleName + "-push", namespace = clusterNs}
+                            metadata = {name = roleName + "-push", namespace = clusterNs, labels = _argoLabels}
                             spec = {
                                 refreshInterval = "0"
                                 deletionPolicy = _pushDeletionPolicy
@@ -507,8 +642,48 @@ spec:
                 }
             }
 
+            # ── dxr update — write resolved cluster back to status ───────────
+            # Emitting an item with the XR's own apiVersion/kind updates the XR itself.
+            # Other XTenantDatabase XRs read status.clusterRef (via function-extra-resources)
+            # for per-cluster tenant counting and collision checks.
+            _resolvedTier = "explicit" if _hasExplicitCluster else tier
+            _dxr = {
+                apiVersion = "platform.wxops.cloud/v1alpha1"
+                kind = "XTenantDatabase"
+                status = {
+                    clusterRef = clusterRef
+                    clusterNamespace = clusterNs
+                    tier = _resolvedTier
+                    dbName = dbName
+                }
+            }
+
+            # ── Dedicated cluster (tier: dedicated only) ─────────────────────
+            # Composes a child XPlatformDatabaseCluster XR with shared: false.
+            # Crossplane retries on transient errors, so the provider-sql Role
+            # reconciles once the child cluster is ready — same eventual-consistency
+            # pattern as when the platform cluster must exist before a tenant DB.
+            _ded_cluster = {
+                apiVersion = "platform.wxops.cloud/v1alpha1"
+                kind = "XPlatformDatabaseCluster"
+                metadata.name = short + "-dedicated-cluster"
+                metadata.annotations = {
+                    "crossplane.io/composition-resource-name" = "dedicated-cluster"
+                }
+                spec.parameters = {
+                    clusterName = _dedClusterName
+                    namespace = _dedNs
+                    instances = _get(_dedCfg, "instances", 1)
+                    storageSize = _get(_dedCfg, "storageSize", "8Gi")
+                    postgresVersion = _get(_dedCfg, "postgresVersion", 16)
+                    enablePooler = _get(_dedCfg, "enablePooler", True)
+                    shared = False
+                    environment = environment
+                }
+            }
+
             # ── Final resource list ────────────────────────────────────────────
-            items = [
+            items = [_dxr] + ([_ded_cluster] if _isDedicated else []) + [
                 _pwd_gen
                 _conn_bundle
                 _sql_role

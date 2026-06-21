@@ -7,8 +7,16 @@ connection credentials synced via ESO.
 
 Each `XTenantDatabase` claim maps to a CNPG `Database` CR + a `provider-sql`
 `Role` + a `PushSecret` that writes connection creds to Vault at
-`tenant/{owner}/{dbName}/connection-creds`. Composition logic is written in
-KCL — see [`kcl/tenant-database/main.k`](../../kcl/tenant-database/main.k).
+`tenants/{owner}/databases/{dbName}/connection-creds`. Composition logic is
+written in KCL — see
+[`kcl/tenant-database/main.k`](../../kcl/tenant-database/main.k).
+
+Two tiers are available:
+- **`shared`** (default) — auto-assigns to the least-loaded
+  `XPlatformDatabaseCluster` labeled `shared: true`, discovered dynamically
+  via `function-extra-resources`.
+- **`dedicated`** — composes a child `XPlatformDatabaseCluster` inline
+  (1 cluster = 1 database, fully isolated).
 
 ## Prerequisites
 
@@ -21,11 +29,13 @@ kubectl apply -f providers/runtimeconfig-provider-kubernetes.yaml
 kubectl apply -f providers/providerconfig-kubernetes.yaml
 kubectl apply -f providers/provider-sql.yaml
 kubectl apply -f providers/function-kcl.yaml
+kubectl apply -f providers/function-extra-resources.yaml
 ```
 
-Also requires at least one [`XPlatformDatabaseCluster`](../platform-database-clusters/)
-to exist (or the `tier` default `shared` → `cluster-a`/`cnpg-system` mapping
-to resolve to a real cluster).
+For `tier: shared`, at least one
+[`XPlatformDatabaseCluster`](../platform-database-clusters/) with
+`shared: true` must exist. For `tier: dedicated`, the composition creates
+the cluster automatically.
 
 ## Install
 
@@ -50,7 +60,8 @@ metadata:
   name: rocket-team-payment-db
 spec:
   parameters:
-    # tier: shared   # default — maps to clusterRef: cluster-a, clusterNamespace: cnpg-system
+    # tier: shared     # default — auto-assigns to least-loaded shared cluster
+    # tier: dedicated  # composes a child cluster (1:1 isolation)
     dbName: payment-db
     owner: rocket-team
     extensions:
@@ -59,14 +70,18 @@ spec:
 ```
 
 See [`examples/tenant-database/xr.yaml`](../../examples/tenant-database/xr.yaml)
-for the full set of optional fields, and
+and [`examples/tenant-database/xr-dedicated.yaml`](../../examples/tenant-database/xr-dedicated.yaml)
+for full examples, and
 [`docs/tenant-database.md`](../../docs/tenant-database.md) for the complete
-`spec.parameters` reference (including `databaseReclaimPolicy` semantics).
+`spec.parameters` reference (including `dedicatedCluster` sizing and
+`databaseReclaimPolicy` semantics).
 
 ## Relation to other packages
 
 ```
-XPlatformDatabaseCluster (cluster-a)
-└── XTenantDatabase (rocket-team / payment-db)
-    └── tenant-app's secretsFrom.database  ← consumes the connection-creds Secret
+XPlatformDatabaseCluster (shared: true)
+└── XTenantDatabase (tier: shared → auto-assigned)
+    └── PushSecret → Vault: tenants/{owner}/databases/{dbName}/connection-creds
+        └── ExternalSecret (GitOps) → Secret in app namespace
+            └── XTenantApp (secretsFrom.database.enabled: true)
 ```

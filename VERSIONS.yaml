@@ -49,23 +49,23 @@ packages:
 
   platform-database-clusters:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1
-    description: Platform-managed CloudNativePG cluster with pooler and Vault credential seeding.
+    description: Platform-managed CloudNativePG cluster with pooler, Vault credential seeding, and shared-cluster labeling for dynamic tenant pool discovery.
 
   tenant-database:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1
-    description: Tenant-facing PostgreSQL database on a platform cluster with Vault-backed credentials and ESO sync.
+    description: Tenant-facing PostgreSQL database with dynamic tier resolution (shared pool auto-assign / dedicated cluster composition), Vault-backed credentials, and ESO sync.
 
   tenant-app:
     package:
-      current: v0.1.1
+      current: v0.1.2
     api:
       served: [v1alpha1]
       storage: v1alpha1

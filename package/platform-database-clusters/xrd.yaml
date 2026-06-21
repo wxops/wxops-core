@@ -53,6 +53,26 @@ spec:
                       type: string
                       default: "8Gi"
                       description: PVC storage size per instance.
+                    shared:
+                      type: boolean
+                      default: false
+                      description: |
+                        Mark this cluster as available for shared multi-tenant
+                        use. When true, the composition sets the
+                        wxops.cloud/shared-cluster label on this XR, allowing
+                        XTenantDatabase to discover it via
+                        function-extra-resources label selector for automatic
+                        tier: shared pool assignment.
+                    environment:
+                      type: string
+                      enum: ["dev", "staging", "prod"]
+                      default: "dev"
+                      description: |
+                        Environment this cluster serves. When shared: true,
+                        XTenantDatabase only auto-assigns databases whose
+                        environment matches this cluster's environment —
+                        dev databases go to dev clusters, prod to prod.
+                        Applied as the wxops.cloud/environment label.
                     vaultPlatformSecretStore:
                       type: string
                       default: "vault-platform"
@@ -343,3 +363,18 @@ spec:
                               type: string
                             namespace:
                               type: string
+            status:
+              type: object
+              properties:
+                clusterName:
+                  type: string
+                  description: CNPG cluster name (echoed from spec.parameters.clusterName).
+                namespace:
+                  type: string
+                  description: Namespace where the CNPG cluster lives.
+                shared:
+                  type: boolean
+                  description: Whether this cluster is in the shared multi-tenant pool.
+                environment:
+                  type: string
+                  description: Environment this cluster serves (dev, staging, prod).
