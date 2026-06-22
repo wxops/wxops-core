@@ -59,6 +59,13 @@ spec:
     vaultPlatformSecretStore: "vault-platform"
 ```
 
+> **Discovery label required**: every `XPlatformDatabaseCluster` XR must
+> include `wxops.cloud/managed-by: platform-database-clusters` in
+> `metadata.labels`. `XTenantDatabase` uses this label to discover clusters
+> for `tier: shared` pool assignment. See
+> [`docs/platform-database-clusters.md`](../../docs/platform-database-clusters.md#required-discovery-label)
+> for details.
+
 See [`examples/platform-database-clusters/xr.yaml`](../../examples/platform-database-clusters/xr.yaml)
 for the full set of optional fields (pooler, tuning, backup, monitoring,
 `managedRoles[]`, `bootstrapFrom`), and

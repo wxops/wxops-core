@@ -103,6 +103,17 @@ make providers
 
 This applies everything in `providers/`: `provider-terraform`, `provider-kubernetes` (+ RBAC and `ProviderConfig`), `provider-sql`, `function-patch-and-transform`, `function-go-templating`, `function-kcl`, `function-extra-resources`, and the Terraform `ProviderConfig`.
 
+>[!NOTE]
+> `make providers` is required before `make install`.** Crossplane's
+> `dependsOn` in `crossplane.yaml` can auto-install missing dependencies, but
+> auto-installed resources get long names derived from the OCI path (e.g.
+> `crossplane-contrib-function-kcl` instead of `function-kcl`). Compositions
+> reference the short names set by `providers/*.yaml`, so auto-installed
+> dependencies will not be found. Additionally, providers like
+> `provider-kubernetes` need a `RuntimeConfig`, RBAC `ClusterRoleBinding`, and
+> `ProviderConfig` — none of which `dependsOn` can provide. The `dependsOn`
+> section serves as a **version constraint safety net**, not an installer.
+
 ### 2 — Create a credentials secret
 
 All packages use the same secret format:

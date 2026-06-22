@@ -43,6 +43,41 @@ ESO sync.
 
 > **Password rotation** is intentionally not implemented: `provider-sql`'s `Role` reconciler only sets the role's password at `Create()` time and never re-applies changes on an existing role, so any rotation must also converge Postgres itself — a platform-level concern (e.g. Vault Database Secrets Engine dynamic/rotated roles), tracked separately in the backlog.
 
+> **Changing `databaseReclaimPolicy` on a live XR**: switching from `retain`
+> to `delete` and then deleting the XR will clean up the Kubernetes resources
+> (Database, Role, Secrets, PushSecret) but **will not remove the Vault
+> entry**. The PushSecret's `deletionPolicy` is updated to `Delete`, but
+> ESO only honours that for entries it created under a `Delete` policy — the
+> original entry was written under `retain` (`deletionPolicy: None`), so ESO
+> does not consider it owned for deletion. The stale Vault entry must be
+> cleaned up manually:
+> ```bash
+> vault kv metadata delete tenants/{owner}/databases/{dbName}/connection-creds
+> ```
+> This only affects the `retain → delete` transition. XRs created with
+> `delete` from the start have full lifecycle cleanup (create → delete →
+> Vault entry removed).
+
+## Required discovery labels
+
+`XTenantDatabase` uses `function-extra-resources` to discover both shared
+clusters and peer databases. Each resource type requires a specific label in
+its manifest for the selectors to find it:
+
+| Resource | Required label | Purpose |
+|---|---|---|
+| `XPlatformDatabaseCluster` | `wxops.cloud/managed-by: platform-database-clusters` | Discovered as candidate for `tier: shared` pool |
+| `XTenantDatabase` | `wxops.cloud/tenant-database: "true"` | Discovered for per-cluster tenant counting and `dbName` collision detection |
+
+Both labels **must be in the XR manifest** — they cannot be set by the
+composition. Crossplane's composite reconciler writes `status` from dxr
+updates but ignores `metadata.labels`, so discovery labels must be applied
+by the user or GitOps.
+
+Without the `XTenantDatabase` label, the composition still works for a
+single database but **cannot detect collisions or balance load** across
+clusters for subsequent databases.
+
 ## Examples
 
 - [`examples/tenant-database/xr.yaml`](../examples/tenant-database/xr.yaml) — shared tier (default)

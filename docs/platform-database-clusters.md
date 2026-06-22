@@ -30,8 +30,8 @@ and optional shared-cluster labeling for dynamic tenant pool discovery.
 | `instances` | `integer` (1–9) | | `1` | Number of PostgreSQL instances. `1` = standalone (dev/test), `3` = HA. |
 | `postgresVersion` | `integer` | | `16` | PostgreSQL major version. Maps to the community image `ghcr.io/cloudnative-pg/postgresql:{version}`. |
 | `storageSize` | `string` | | `"8Gi"` | PVC storage size per instance. |
-| `shared` | `boolean` | | `false` | Mark this cluster as available for shared multi-tenant use. When `true`, the composition sets the `wxops.cloud/shared-cluster` label on this XR, allowing `XTenantDatabase` to discover it via `function-extra-resources` label selector for automatic `tier: shared` pool assignment. |
-| `environment` | `string` (`dev`, `staging`, `prod`) | | `"dev"` | Environment this cluster serves. When `shared: true`, `XTenantDatabase` only auto-assigns databases whose `environment` matches — dev databases go to dev clusters, prod to prod. Applied as the `wxops.cloud/environment` label. |
+| `shared` | `boolean` | | `false` | Mark this cluster as available for shared multi-tenant use. When `true`, the composition writes `status.shared: true`, and `XTenantDatabase` filters by this status field to build the shared pool. |
+| `environment` | `string` (`dev`, `staging`, `prod`) | | `"dev"` | Environment this cluster serves. When `shared: true`, `XTenantDatabase` only auto-assigns databases whose `environment` matches — dev databases go to dev clusters, prod to prod. Written to `status.environment`. |
 | `vaultPlatformSecretStore` | `string` | | `"vault-platform"` | ESO `ClusterSecretStore` name used by `PushSecret` to mirror CNPG's own `{clusterName}-superuser` and `{clusterName}-app` secrets to Vault at `database-clusters/{clusterName}/superuser-creds` and `database-clusters/{clusterName}/app-creds`. Each push writes the whole secret in one go (no per-key `property`), so only one Vault KV2 version is created per reconcile. When `enablePooler` is true, pooler-prefixed connection strings (`pooler-host`, `pooler-port`, `pooler-uri`, `pooler-jdbc-uri`, `pooler-pgpass`) are merged into both Vault entries via the PushSecret's `spec.template`. |
 
 ### Pooler (RW)
@@ -161,6 +161,29 @@ instance is never touched after the cluster is `Ready`.
 | `bootstrapFrom.sourcePasswordSecretRef` | `object` | | | Existing K8s Secret with key `password` holding the source superuser password. Must exist before the XR is applied. |
 | `bootstrapFrom.sourcePasswordSecretRef.name` | `string` | | | |
 | `bootstrapFrom.sourcePasswordSecretRef.namespace` | `string` | | | |
+
+## Required discovery label
+
+`XTenantDatabase` discovers platform clusters via `function-extra-resources`,
+which selects XRs by label. Every `XPlatformDatabaseCluster` XR **must**
+include this label in its manifest:
+
+```yaml
+metadata:
+  labels:
+    wxops.cloud/managed-by: platform-database-clusters
+```
+
+> **Why a manifest label?** Crossplane's composite reconciler writes `status`
+> fields from composition dxr updates, but **ignores `metadata.labels`**. The
+> composition cannot set discovery labels automatically — they must be in the
+> XR manifest applied by the user or GitOps. Without this label,
+> `XTenantDatabase` will not discover the cluster for `tier: shared`
+> auto-assignment.
+
+The composition uses `status.shared` and `status.environment` (written by
+the dxr update) to filter the pool — the label only controls **which XRs
+are fetched**, not which ones are selected as shared.
 
 ## Example
 

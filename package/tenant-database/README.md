@@ -69,6 +69,15 @@ spec:
       - pgcrypto
 ```
 
+> **Discovery labels required**: every `XTenantDatabase` XR must include
+> `wxops.cloud/tenant-database: "true"` in `metadata.labels` — needed for
+> per-cluster tenant counting and `dbName` collision detection. Every
+> `XPlatformDatabaseCluster` must include
+> `wxops.cloud/managed-by: platform-database-clusters` for shared pool
+> discovery. See
+> [`docs/tenant-database.md`](../../docs/tenant-database.md#required-discovery-labels)
+> for details.
+
 See [`examples/tenant-database/xr.yaml`](../../examples/tenant-database/xr.yaml)
 and [`examples/tenant-database/xr-dedicated.yaml`](../../examples/tenant-database/xr-dedicated.yaml)
 for full examples, and
