@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.4] — 2026-06-22
+
+### Bug Fixes
+
+- Patch the decision to provision database base on dxr and label ([`2b304fd`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/2b304fdac1ff6b55d803b7dccf18bbaed4084b7a))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.4/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.4/VERSIONS.yaml)
+🔍 [Diff vs 0.2.3](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.3...v0.2.4)
 ## [0.2.3] — 2026-06-22
 
 ### Chores
@@ -114,11 +124,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.4
 [0.2.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.3
 [0.2.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.2
 [0.2.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.1
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.3...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.4...HEAD
 
