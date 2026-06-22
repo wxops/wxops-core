@@ -3,5 +3,5 @@ kind: Provider
 metadata:
   name: provider-terraform
 spec:
-  package: xpkg.upbound.io/upbound/provider-terraform:v1.1.4
+  package: xpkg.upbound.io/upbound/provider-terraform:v1.1.5
   packagePullPolicy: IfNotPresent

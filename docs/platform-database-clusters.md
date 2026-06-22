@@ -120,6 +120,13 @@ to Vault at `database-clusters/{clusterName}/roles/{name}/creds` (whole-secret p
 | `managedRoles[].ensure` | `string` (`present`, `absent`) | | `present` | |
 | `managedRoles[].login` | `boolean` | | `true` | |
 | `managedRoles[].superuser` | `boolean` | | `false` | |
+| `managedRoles[].createdb` | `boolean` | | `false` | Grant `CREATEDB` privilege. |
+| `managedRoles[].createrole` | `boolean` | | `false` | Grant `CREATEROLE` privilege. |
+| `managedRoles[].inherit` | `boolean` | | `true` | Inherit privileges of roles this role is a member of (via `inRoles`). Default `true` per PostgreSQL convention. |
+| `managedRoles[].replication` | `boolean` | | `false` | Grant `REPLICATION` privilege. |
+| `managedRoles[].bypassrls` | `boolean` | | `false` | Bypass row-level security policies. |
+| `managedRoles[].connectionLimit` | `integer` | | `-1` | Max concurrent connections for this role. `-1` = unlimited. |
+| `managedRoles[].inRoles` | `array<string>` | | `[]` | Roles this role is a member of. Use for PostgreSQL predefined roles (`pg_read_all_data`, `pg_write_all_data`, `pg_monitor`, `pg_signal_backend`, etc.) or custom parent roles. See [PostgreSQL predefined roles](https://www.postgresql.org/docs/current/predefined-roles.html). |
 
 ### `bootstrapFrom`
 

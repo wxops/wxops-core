@@ -10,9 +10,9 @@ Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native p
 | [`gitea-org`](package/gitea-org/) | `XGiteaOrg` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`gitea-team`](package/gitea-team/) | `XGiteaTeam` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`gitea-repository`](package/gitea-repository/) | `XGiteaRepository` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
-| [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
-| [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
-| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
+| [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.1` |
+| [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.2` |
+| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.2` |
 
 > `random-password` lives in `package/random-password/` as a utility composition but is not yet published as a standalone OCI package.
 
@@ -69,6 +69,7 @@ examples/                     ← minimal XR YAML to exercise each package
   random-password/xr.yaml
   platform-database-clusters/xr.yaml
   tenant-database/xr.yaml
+  tenant-database/xr-dedicated.yaml
   tenant-app/xr.yaml
 kcl/                          ← KCL composition functions (source of truth, embedded via kcl-sync)
   platform-database-clusters/
@@ -100,7 +101,7 @@ kcl/                          ← KCL composition functions (source of truth, em
 make providers
 ```
 
-This applies everything in `providers/`: `provider-terraform`, `provider-kubernetes` (+ RBAC and `ProviderConfig`), `provider-sql`, `function-patch-and-transform`, `function-go-templating`, `function-kcl`, and the Terraform `ProviderConfig`.
+This applies everything in `providers/`: `provider-terraform`, `provider-kubernetes` (+ RBAC and `ProviderConfig`), `provider-sql`, `function-patch-and-transform`, `function-go-templating`, `function-kcl`, `function-extra-resources`, and the Terraform `ProviderConfig`.
 
 ### 2 — Create a credentials secret
 
@@ -261,7 +262,9 @@ chore(ci): pin crossplane CLI to v2.3.1 in publish workflow
 | Component | Version | Reference |
 |---|---|---|
 | Crossplane | v2.3 | https://docs.crossplane.io/v2.3/ |
-| provider-terraform | v1.1.4 | https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.4 |
-| function-patch-and-transform | v0.10.6 | https://marketplace.upbound.io/functions/crossplane-contrib/function-patch-and-transform/v0.10.6 |
-| function-go-templating | v0.12.1 | https://marketplace.upbound.io/functions/crossplane-contrib/function-go-templating/v0.12.1 |
+| provider-terraform | v1.1.5 | https://marketplace.upbound.io/providers/upbound/provider-terraform/v1.1.5 |
+| function-patch-and-transform | v0.10.7 | https://marketplace.upbound.io/functions/crossplane-contrib/function-patch-and-transform/v0.10.7 |
+| function-go-templating | v0.12.2 | https://marketplace.upbound.io/functions/crossplane-contrib/function-go-templating/v0.12.2 |
+| function-kcl | v0.12.1 | https://marketplace.upbound.io/functions/crossplane-contrib/function-kcl/v0.12.1 |
+| function-extra-resources | v0.3.0 | https://marketplace.upbound.io/functions/crossplane-contrib/function-extra-resources/v0.3.0 |
 | Gitea Terraform provider | ~> 0.7.0 | https://registry.terraform.io/providers/go-gitea/gitea/latest/docs |

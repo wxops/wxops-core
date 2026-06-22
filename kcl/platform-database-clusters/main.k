@@ -304,8 +304,14 @@ _managedRoleEntries = [{
     ensure = _get(r, "ensure", "present")
     login = _get(r, "login", True)
     superuser = _get(r, "superuser", False)
+    createdb = _get(r, "createdb", False)
+    createrole = _get(r, "createrole", False)
+    inherit = _get(r, "inherit", True)
+    replication = _get(r, "replication", False)
+    bypassrls = _get(r, "bypassrls", False)
+    connectionLimit = _get(r, "connectionLimit", -1)
     passwordSecret = {name = c + "-" + r.name + "-creds"}
-} for r in managedRoles]
+} | ({"inRoles": r.inRoles} if _get(r, "inRoles", []) else {}) for r in managedRoles]
 
 # ── Section 6: CNPG Cluster spec (assembled from optional sections) ───────────
 _cnpgSpec = {
