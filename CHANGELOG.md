@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.3] — 2026-06-22
+
+### Chores
+
+- Fix error version function extra resources and bump latest version for provider and function ([`80a7d99`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/80a7d9907d5ef1b81359ad1491026226f6046fd2))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.3/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.3/VERSIONS.yaml)
+🔍 [Diff vs 0.2.2](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.2...v0.2.3)
 ## [0.2.2] — 2026-06-21
 
 ### Features
@@ -104,10 +114,11 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.3
 [0.2.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.2
 [0.2.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.1
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.2...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.3...HEAD
 
