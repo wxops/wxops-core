@@ -58,11 +58,11 @@ spec:
                       default: false
                       description: |
                         Mark this cluster as available for shared multi-tenant
-                        use. When true, the composition sets the
-                        wxops.cloud/shared-cluster label on this XR, allowing
-                        XTenantDatabase to discover it via
-                        function-extra-resources label selector for automatic
-                        tier: shared pool assignment.
+                        use. When true, the composition writes status.shared,
+                        allowing XTenantDatabase to filter this cluster into
+                        the tier: shared pool. The XR must also have the
+                        wxops.cloud/managed-by: platform-database-clusters
+                        label in its manifest for discovery.
                     environment:
                       type: string
                       enum: ["dev", "staging", "prod"]
@@ -72,7 +72,7 @@ spec:
                         XTenantDatabase only auto-assigns databases whose
                         environment matches this cluster's environment —
                         dev databases go to dev clusters, prod to prod.
-                        Applied as the wxops.cloud/environment label.
+                        Written to status.environment.
                     vaultPlatformSecretStore:
                       type: string
                       default: "vault-platform"

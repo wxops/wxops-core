@@ -32,8 +32,8 @@ spec:
                 postgresVersion         int      PostgreSQL major version. Default: 16.
                 storageSize             string   PVC size per instance. Default: "8Gi".
                 shared                  bool     Mark as shared multi-tenant pool. Default: false.
-                                                   Sets wxops.cloud/shared-cluster label for discovery
-                                                   by XTenantDatabase's function-extra-resources selector.
+                                                   Written to status.shared for discovery by
+                                                   XTenantDatabase's pool filtering logic.
                 vaultPlatformSecretStore string  ESO ClusterSecretStore for PushSecret. Default: "vault-platform".
                                                    NOTE: this store is itself scoped to the "platform/" KV2 path,
                                                    so all paths below omit "platform/" (e.g. "database-clusters/...")
@@ -751,19 +751,15 @@ spec:
                 }
             } for r in managedRoles]
 
-            # ── Section 15: dxr update — shared label + status ──────────────────────────
+            # ── Section 15: dxr update — status writeback ────────────────────────────────
             # Emitting an item with the XR's own apiVersion/kind updates the XR itself.
-            # function-extra-resources in XTenantDatabase selects shared clusters by the
-            # wxops.cloud/shared-cluster label, then reads status fields.
+            # XTenantDatabase reads status.shared + status.environment to filter the
+            # shared pool, and status.clusterName + status.namespace for assignment.
+            # NOTE: dxr updates write status but Crossplane ignores metadata.labels —
+            # discovery labels (wxops.cloud/managed-by) must be in the XR manifest.
             _dxr = {
                 apiVersion = "platform.wxops.cloud/v1alpha1"
                 kind = "XPlatformDatabaseCluster"
-                metadata.labels = ({
-                    "wxops.cloud/shared-cluster": "true"
-                    "wxops.cloud/environment": environment
-                } if shared else {
-                    "wxops.cloud/environment": environment
-                })
                 status = {
                     clusterName = c
                     namespace = ns

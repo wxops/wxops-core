@@ -2,6 +2,8 @@ apiVersion: platform.wxops.cloud/v1alpha1
 kind: XTenantDatabase
 metadata:
   name: rocket-team-payment-db
+  labels:
+    wxops.cloud/tenant-database: "true"
 spec:
   parameters:
     # tier: shared     # default — auto-assigns to the least-loaded shared cluster
@@ -31,4 +33,4 @@ spec:
     # (provider-sql's Observe() needs it even while deleting the Role).
     # databaseReclaimPolicy: "retain"
 
-    vaultSecretStoreName: "vault-cluster-store"
+    vaultSecretStoreName: "vault-tenant"

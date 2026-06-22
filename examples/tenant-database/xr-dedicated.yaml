@@ -2,13 +2,15 @@ apiVersion: platform.wxops.cloud/v1alpha1
 kind: XTenantDatabase
 metadata:
   name: rocket-team-analytics-db
+  labels:
+    wxops.cloud/tenant-database: "true"
 spec:
   parameters:
     tier: dedicated
     environment: dev
     dedicatedCluster:
-      instances: 3           # HA cluster
-      storageSize: "50Gi"
+      instances: 1
+      storageSize: "1Gi"
       postgresVersion: 16
       enablePooler: true
       # namespace: cnpg-system  # default
@@ -20,4 +22,4 @@ spec:
       - pgcrypto
 
     # databaseReclaimPolicy: "retain"
-    vaultSecretStoreName: "vault-cluster-store"
+    vaultSecretStoreName: "vault-tenant"

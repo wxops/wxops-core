@@ -44,15 +44,15 @@ database for this app, but `tenant-app` itself has zero database-awareness.
 
 ---
 
-## `XTenantDatabase` — dynamic tier resolution — shipped in v0.2.2
+## `XTenantDatabase` — dynamic tier resolution — shipped v0.2.2, fixed v0.2.4
 
 - [x] Replace hardcoded `_clusterTierMap` with dynamic discovery via
-      `function-extra-resources` label selector
-      (`wxops.cloud/shared-cluster: "true"`).
+      `function-extra-resources`.
 - [x] `XPlatformDatabaseCluster.shared` toggle + `status` subresource
-      (clusterName, namespace, shared) for pool discovery.
+      (clusterName, namespace, shared, environment) for pool discovery.
 - [x] `tier: shared` — pool-based auto-assignment: least-loaded cluster,
-      `dbName` collision check, assert if no shared clusters exist.
+      environment isolation, `dbName` collision check, sticky assignment
+      via status writeback.
 - [x] `tier: dedicated` — compose a child `XPlatformDatabaseCluster` XR
       inline (1 cluster = 1 database, fully isolated), sized via
       `dedicatedCluster` parameters.
@@ -60,6 +60,29 @@ database for this app, but `tenant-app` itself has zero database-awareness.
       `{owner}/databases/{dbName}/connection-creds` (logical:
       `tenants/{owner}/databases/{dbName}/...`).
 - [x] `function-extra-resources` provider + `crossplane.yaml` dependency.
+
+### v0.2.4 bug fixes — discovery label contract
+
+v0.2.2 assumed the composition could set discovery labels on XRs via dxr
+updates. In practice, **Crossplane writes `status` from dxr but ignores
+`metadata.labels`**. v0.2.4 fixes this with a label contract:
+
+- [x] Extra resources read from pipeline context
+      (`ctx["apiextensions.crossplane.io/extra-resources"]`), not
+      `option("params").extraResources`.
+- [x] Resources in context are unwrapped (`{apiVersion, kind, ...}`),
+      not `{resource: ...}`.
+- [x] `_get` helper guards `d or {}` against KCL `Undefined` dicts.
+- [x] `matchLabels` required on every selector (v0.3.0 silently skips
+      empty `matchLabels`).
+- [x] Pool filtering by `status.shared` + `status.environment` in KCL
+      (with fallback to `spec.parameters` for unreconciled clusters).
+- [x] Discovery labels must be in the XR manifest (user/GitOps):
+
+| Resource | Required label |
+|---|---|
+| `XPlatformDatabaseCluster` | `wxops.cloud/managed-by: platform-database-clusters` |
+| `XTenantDatabase` | `wxops.cloud/tenant-database: "true"` |
 
 ---
 

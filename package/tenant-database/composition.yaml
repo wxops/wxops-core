@@ -20,14 +20,16 @@ spec:
         spec:
           extraResources:
             - kind: XPlatformDatabaseCluster
-              into: sharedClusters
+              into: allClusters
               apiVersion: platform.wxops.cloud/v1alpha1
               type: Selector
               selector:
+                maxMatch: 100
+                minMatch: 0
                 matchLabels:
-                  - key: wxops.cloud/shared-cluster
+                  - key: wxops.cloud/managed-by
                     type: Value
-                    value: "true"
+                    value: platform-database-clusters
             - kind: XTenantDatabase
               into: existingDatabases
               apiVersion: platform.wxops.cloud/v1alpha1
@@ -35,6 +37,10 @@ spec:
               selector:
                 maxMatch: 500
                 minMatch: 0
+                matchLabels:
+                  - key: wxops.cloud/tenant-database
+                    type: Value
+                    value: "true"
 
     - step: render
       functionRef:
@@ -142,7 +148,8 @@ spec:
             short = uid[:8:]
 
             _get = lambda d: any, k: str, default: any -> any {
-                d[k] if k in d else default
+                _safe = d or {}
+                _safe[k] if k in _safe else default
             }
 
             # ── ArgoCD resource tracking ─────────────────────────────────────────────────
@@ -150,17 +157,18 @@ spec:
             # the XR to the Application name. Propagate this to composed Object CRs so
             # ArgoCD discovers the full resource tree in its UI. If the XR wasn't applied
             # by ArgoCD (e.g. kubectl apply), the label is absent and nothing happens.
-            _oxrLabels = oxr.metadata.labels if "labels" in oxr.metadata else {}
+            _oxrLabels = _get(oxr.metadata, "labels", {})
             _argoInstance = _get(_oxrLabels, "app.kubernetes.io/instance", "")
             _argoLabels = {"app.kubernetes.io/instance": _argoInstance} if _argoInstance else {}
 
             # ── Tier resolution — dynamic discovery via function-extra-resources ──────────
-            # function-extra-resources (pipeline step before this one) fetches:
-            #   sharedClusters    — all XPlatformDatabaseCluster XRs with wxops.cloud/shared-cluster: "true"
+            # function-extra-resources stores results in the pipeline context at
+            # "apiextensions.crossplane.io/extra-resources", NOT in option("params").extraResources.
+            #   allClusters       — all XPlatformDatabaseCluster XRs (filtered by shared + environment in KCL)
             #   existingDatabases — all XTenantDatabase XRs (for per-cluster tenant count + collision checks)
-            _extraResources = option("params").extraResources or {}
-            _sharedClusters = [r.resource for r in (_extraResources.sharedClusters or [])]
-            _existingDbs = [r.resource for r in (_extraResources.existingDatabases or [])]
+            _ctxExtras = option("params").ctx["apiextensions.crossplane.io/extra-resources"] or {}
+            _allClusters = _ctxExtras.allClusters or []
+            _existingDbs = _ctxExtras.existingDatabases or []
 
             dbName = params.dbName
             owner = params.owner
@@ -171,9 +179,11 @@ spec:
             # ── Helper: get resolved clusterRef from a peer XTenantDatabase XR ───────────
             # Priority: status.clusterRef (set by composition) > spec.parameters.clusterRef (explicit).
             _peerCluster = lambda db: any -> str {
-                _dbStatus = db.status if "status" in db else {}
+                _dbStatus = _get(db, "status", {})
+                _dbSpec = _get(db, "spec", {})
+                _dbParams = _get(_dbSpec, "parameters", {})
                 _statusRef = _get(_dbStatus, "clusterRef", "")
-                _specRef = _get(db.spec.parameters, "clusterRef", "") if "spec" in db and "parameters" in db.spec else ""
+                _specRef = _get(_dbParams, "clusterRef", "")
                 _statusRef if _statusRef else _specRef
             }
 
@@ -182,7 +192,7 @@ spec:
             # cluster. On subsequent renders, status.clusterRef is set — reuse it to
             # prevent re-balancing on every reconcile (adding a new empty cluster shouldn't
             # cause existing databases to migrate).
-            _oxrStatus = oxr.status if "status" in oxr else {}
+            _oxrStatus = _get(oxr, "status", {})
             _stickyCluster = _get(_oxrStatus, "clusterRef", "")
             _stickyNs = _get(_oxrStatus, "clusterNamespace", "")
             _hasSticky = bool(_stickyCluster) and bool(_stickyNs) and not _hasExplicitCluster and tier == "shared"
@@ -197,12 +207,47 @@ spec:
             #    (not spec.parameters.clusterRef — auto-assigned databases don't have that).
             # 3. Pick the cluster with the fewest tenants (least-loaded).
 
+            _clusterStatus = lambda sc: any -> any {
+                _get(sc, "status", {})
+            }
+
+            _clusterParams = lambda sc: any -> any {
+                _spec = _get(sc, "spec", {})
+                _get(_spec, "parameters", {})
+            }
+
+            _clusterShared = lambda sc: any -> bool {
+                _st = _clusterStatus(sc)
+                _sp = _clusterParams(sc)
+                _val = _get(_st, "shared", _get(_sp, "shared", False))
+                _val in [True, "true"]
+            }
+
+            _clusterEnv = lambda sc: any -> str {
+                _st = _clusterStatus(sc)
+                _sp = _clusterParams(sc)
+                _val = _get(_st, "environment", _get(_sp, "environment", "dev"))
+                str(_val)
+            }
+
+            _clusterName = lambda sc: any -> str {
+                _st = _clusterStatus(sc)
+                _sp = _clusterParams(sc)
+                str(_get(_st, "clusterName", _get(_sp, "clusterName", "")))
+            }
+
+            _clusterNs = lambda sc: any -> str {
+                _st = _clusterStatus(sc)
+                _sp = _clusterParams(sc)
+                str(_get(_st, "namespace", _get(_sp, "namespace", "")))
+            }
+
             _sharedPool = [{
-                clusterName = sc.status.clusterName
-                namespace = sc.status.namespace
-            } for sc in _sharedClusters \
-                if "status" in sc and "clusterName" in sc.status \
-                and _get(sc.status, "environment", "dev") == environment]
+                clusterName = _clusterName(sc)
+                namespace = _clusterNs(sc)
+            } for sc in _allClusters \
+                if _clusterShared(sc) and _clusterEnv(sc) == environment \
+                and _clusterName(sc)]
 
             _dbCountByCluster = lambda clusterName: str -> int {
                 len([
@@ -247,10 +292,9 @@ spec:
             # - Same owner + same dbName = identical roleName, Secrets, Vault path (full collision)
             _dbNameCollisions = [
                 db for db in _existingDbs
-                if "spec" in db and "parameters" in db.spec \
-                   and _get(db.spec.parameters, "dbName", "") == dbName \
+                if _get(_get(_get(db, "spec", {}), "parameters", {}), "dbName", "") == dbName \
                    and _peerCluster(db) == clusterRef \
-                   and db.metadata.uid != uid
+                   and _get(_get(db, "metadata", {}), "uid", "") != uid
             ]
             assert not _dbNameCollisions, \
                 "dbName '${dbName}' already exists on cluster '${clusterRef}'"
@@ -650,6 +694,9 @@ spec:
             _dxr = {
                 apiVersion = "platform.wxops.cloud/v1alpha1"
                 kind = "XTenantDatabase"
+                metadata.labels = {
+                    "wxops.cloud/tenant-database" = "true"
+                }
                 status = {
                     clusterRef = clusterRef
                     clusterNamespace = clusterNs
