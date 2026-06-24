@@ -1,8 +1,9 @@
 # platform-wxops-tenant-app
 
 Crossplane Configuration package that provisions a tenant application
-scaffold — `Deployment` + `Service` + optional `Ingress` (+ optional debug
-`devSpace` twin), following `app.kubernetes.io/*` label conventions.
+scaffold — `Deployment` + `Service` + optional `Ingress` + optional
+`ServiceAccount` (+ optional debug `devSpace` twin), following
+`app.kubernetes.io/*` label conventions.
 
 This package deliberately stops at the application workload: Vault-backed
 secrets and databases are platform-level concerns, wired in via
@@ -61,15 +62,28 @@ spec:
     image:
       repository: ghcr.io/rocket-team/payment-api
       tag: "1.4.0"
+    imagePullSecrets:
+      - my-registry-creds
+    serviceAccount:
+      create: true
+      annotations:
+        eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/payment-api
+    securityContext:
+      runAsNonRoot: true
+      runAsUser: 1000
+      readOnlyRootFilesystem: true
+      capabilities:
+        drop: ["ALL"]
     ingress:
       enabled: true
       host: payment-api.rocket-team.example.com
 ```
 
 See [`examples/tenant-app/xr.yaml`](../../examples/tenant-app/xr.yaml) for the
-full set of optional fields (`secretsFrom`, `rolloutStrategy`, `devSpace`,
-`probes`, `ingress.tls`/`ingress.auth`, `labels`/`deploymentAnnotations`,
-`templateId`/`repository.url`), and
+full set of optional fields (`serviceAccount`, `securityContext`,
+`terminationGracePeriodSeconds`, `imagePullSecrets`, `secretsFrom`,
+`rolloutStrategy`, `devSpace`, `probes`, `ingress.tls`/`ingress.auth`,
+`labels`/`deploymentAnnotations`, `templateId`/`repository.url`), and
 [`docs/tenant-app.md`](../../docs/tenant-app.md) for the complete
 `spec.parameters` reference and the Golden Path Contract.
 

@@ -38,6 +38,25 @@ Inputs (via option("params").oxr.spec.parameters):
                        wxops.cloud/template-id, wxops.cloud/repo-url, and
                        (if reloader.enabled) reloader.stakater.com/auto.
 
+  serviceAccount.create      bool   Default: false. If true, compose a
+                      ServiceAccount named after appName (or .name).
+  serviceAccount.name        string Default: appName (when create is true).
+                      When create is false, references an existing SA.
+  serviceAccount.annotations object Default: {}. Annotations on the
+                      created SA (e.g. workload identity bindings).
+  securityContext     object  Pod-level and container-level security settings.
+                      Pod: runAsNonRoot, runAsUser, runAsGroup, fsGroup.
+                      Container: readOnlyRootFilesystem,
+                      allowPrivilegeEscalation (default false),
+                      capabilities.drop/add.
+  terminationGracePeriodSeconds int Default: 30. Seconds to wait for
+                      graceful shutdown after SIGTERM before SIGKILL.
+
+  imagePullSecrets   [string] Names of existing Secrets (type
+                      kubernetes.io/dockerconfigjson) for pulling from
+                      private registries. Added to pod spec on both the
+                      main Deployment and devSpace. Default: [].
+
   image.repository   string  Container image repository.
   image.tag          string  Image tag. Default: "latest".
   image.pullPolicy   string  Default: "IfNotPresent".
@@ -138,10 +157,11 @@ Inputs (via option("params").oxr.spec.parameters):
                       pod alive for exec/port-forward without serving traffic.
 
 Composed resources:
-  app-deployment      apps/v1                       Deployment — app workload.
-  app-dev-deployment  apps/v1                       Deployment — debug twin (if devSpace.enabled).
-  app-service         v1                            Service    — (if service.enabled, default true).
-  app-ingress         networking.k8s.io/v1          Ingress    — (if ingress.enabled).
+  app-deployment      apps/v1                       Deployment      — app workload.
+  app-dev-deployment  apps/v1                       Deployment      — debug twin (if devSpace.enabled).
+  app-service-account v1                            ServiceAccount  — (if serviceAccount.create).
+  app-service         v1                            Service         — (if service.enabled, default true).
+  app-ingress         networking.k8s.io/v1          Ingress         — (if ingress.enabled).
 
 This XR deliberately stops at the application workload: Vault-backed secrets
 (ExternalSecret/PushSecret) and databases (XTenantDatabase) are platform-level
@@ -163,6 +183,33 @@ appName = params.appName
 ns = params.namespace
 appFlavor = _get(params, "appFlavor", "webapp")
 environment = _get(params, "environment", "dev")
+_imagePullSecrets = _get(params, "imagePullSecrets", [])
+_terminationGracePeriod = _get(params, "terminationGracePeriodSeconds", 30)
+
+# ── ServiceAccount ────────────────────────────────────────────────
+_sa = _get(params, "serviceAccount", {})
+_saCreate = _get(_sa, "create", False)
+_saName = _get(_sa, "name", appName) if _saCreate else _get(_sa, "name", "")
+_saAnnotations = _get(_sa, "annotations", {})
+
+# ── Security context ──────────────────────────────────────────────
+_sc = _get(params, "securityContext", {})
+
+_podSecurityContext = {} \
+    | ({"runAsNonRoot" = _sc.runAsNonRoot} if "runAsNonRoot" in _sc else {}) \
+    | ({"runAsUser" = _sc.runAsUser} if "runAsUser" in _sc else {}) \
+    | ({"runAsGroup" = _sc.runAsGroup} if "runAsGroup" in _sc else {}) \
+    | ({"fsGroup" = _sc.fsGroup} if "fsGroup" in _sc else {})
+
+_caps = _get(_sc, "capabilities", {})
+_capsObj = {} \
+    | ({"drop" = _caps.drop} if "drop" in _caps and len(_caps.drop) > 0 else {}) \
+    | ({"add" = _caps.add} if "add" in _caps and len(_caps.add) > 0 else {})
+
+_containerSecurityContext = {} \
+    | ({"readOnlyRootFilesystem" = _sc.readOnlyRootFilesystem} if "readOnlyRootFilesystem" in _sc else {}) \
+    | ({"allowPrivilegeEscalation" = _sc.allowPrivilegeEscalation} if "allowPrivilegeEscalation" in _sc else {}) \
+    | ({"capabilities" = _capsObj} if len(_capsObj) > 0 else {})
 
 # Extra user-supplied labels are merged in first so the standard
 # app.kubernetes.io/* and wxops.cloud/* labels below always win — selectors
@@ -288,7 +335,8 @@ _container_env = _base_container | ({"envFrom" = _envFrom} if len(_envFrom) > 0 
 _container_res = _container_env | ({"resources" = params.resources} if "resources" in params else {})
 _container_cmd = _container_res | ({"command" = params.command} if "command" in params else {})
 _container_args = _container_cmd | ({"args" = params.args} if "args" in params else {})
-_container_liveness = _container_args | ({"livenessProbe" = _livenessProbe} if livenessEnabled else {})
+_container_sec = _container_args | ({"securityContext" = _containerSecurityContext} if len(_containerSecurityContext) > 0 else {})
+_container_liveness = _container_sec | ({"livenessProbe" = _livenessProbe} if livenessEnabled else {})
 _container_readiness = _container_liveness | ({"readinessProbe" = _readinessProbe} if readinessEnabled else {})
 _container = _container_readiness | ({"startupProbe" = _startupProbe} if startupEnabled else {})
 
@@ -319,7 +367,11 @@ _deployment = {
                     selector = {matchLabels = labels}
                     template = {
                         metadata = {labels = labels, annotations = _podAnnotations}
-                        spec = {containers = [_container]}
+                        spec = {containers = [_container]} \
+                            | ({"imagePullSecrets" = [{"name" = s} for s in _imagePullSecrets]} if len(_imagePullSecrets) > 0 else {}) \
+                            | ({"serviceAccountName" = _saName} if _saName != "" else {}) \
+                            | ({"securityContext" = _podSecurityContext} if len(_podSecurityContext) > 0 else {}) \
+                            | ({"terminationGracePeriodSeconds" = _terminationGracePeriod} if _terminationGracePeriod != 30 else {})
                     }
                 }
             }
@@ -347,7 +399,9 @@ _dev_container = {
     ports = [{containerPort = containerPort}]
     env = _env
     command = _devCommand
-} | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {}) | ({"resources" = params.resources} if "resources" in params else {})
+} | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {}) \
+  | ({"resources" = params.resources} if "resources" in params else {}) \
+  | ({"securityContext" = _containerSecurityContext} if len(_containerSecurityContext) > 0 else {})
 
 _dev_deployment = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
@@ -375,7 +429,11 @@ _dev_deployment = {
                     selector = {matchLabels = _devLabels}
                     template = {
                         metadata = {labels = _devLabels}
-                        spec = {containers = [_dev_container]}
+                        spec = {containers = [_dev_container]} \
+                            | ({"imagePullSecrets" = [{"name" = s} for s in _imagePullSecrets]} if len(_imagePullSecrets) > 0 else {}) \
+                            | ({"serviceAccountName" = _saName} if _saName != "" else {}) \
+                            | ({"securityContext" = _podSecurityContext} if len(_podSecurityContext) > 0 else {}) \
+                            | ({"terminationGracePeriodSeconds" = _terminationGracePeriod} if _terminationGracePeriod != 30 else {})
                     }
                 }
             }
@@ -490,5 +548,32 @@ _ingress = {
     }
 }
 
+# ── ServiceAccount ─────────────────────────────────────────────────
+_serviceAccount = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-sa"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-service-account"
+        }
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "v1"
+                kind = "ServiceAccount"
+                metadata = {
+                    name = _saName
+                    namespace = ns
+                    labels = labels
+                    annotations = _commonAnnotations | _saAnnotations
+                }
+            }
+        }
+    }
+}
+
 # ── Final resource list ─────────────────────────────────────────────
-items = [_deployment] + ([_dev_deployment] if devSpaceEnabled else []) + ([_service] if serviceEnabled else []) + ([_ingress] if ingressEnabled else [])
+items = [_deployment] + ([_dev_deployment] if devSpaceEnabled else []) + ([_serviceAccount] if _saCreate else []) + ([_service] if serviceEnabled else []) + ([_ingress] if ingressEnabled else [])
