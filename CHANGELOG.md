@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.5] — 2026-06-24
+
+### Chores
+
+- Enhance tenant-app xrds for image-pull secrets, service account and securityContext ([`dbe66ef`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/dbe66ef3d7b8db52e3ae1d559b267c38676e0c61))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.5/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.5/VERSIONS.yaml)
+🔍 [Diff vs 0.2.4](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.4...v0.2.5)
 ## [0.2.4] — 2026-06-22
 
 ### Bug Fixes
@@ -124,6 +134,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.5]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.5
 [0.2.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.4
 [0.2.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.3
 [0.2.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.2
@@ -131,5 +142,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.4...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.5...HEAD
 
