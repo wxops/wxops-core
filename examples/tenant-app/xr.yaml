@@ -16,6 +16,27 @@ spec:
     image:
       repository: ghcr.io/rocket-team/payment-api
       tag: "1.4.0"
+    # imagePullSecrets:
+    #   - my-registry-creds    # existing Secret (kubernetes.io/dockerconfigjson)
+    #                           # must exist in the target namespace
+
+    # serviceAccount:
+    #   create: true            # compose a new SA (default: false = use existing/default)
+    #   # name: payment-api    # defaults to appName when create: true
+    #   annotations:
+    #     eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/payment-api
+    #     # or: iam.gke.io/gcp-service-account: payment-api@project.iam.gserviceaccount.com
+
+    securityContext: {}
+    # securityContext:
+    #   runAsNonRoot: true
+    #   runAsUser: 1000
+    #   readOnlyRootFilesystem: true
+    #   allowPrivilegeEscalation: false
+    #   capabilities:
+    #     drop: ["ALL"]
+
+    # terminationGracePeriodSeconds: 60  # default: 30
 
     # ── Everything below is optional — shown enabled for reference ──────
     # replicas: 2

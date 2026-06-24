@@ -1,7 +1,7 @@
 # XTenantApp
 
 Tenant application scaffold — provisions a `Deployment` + `Service` +
-optional `Ingress` for an application workload, following the
+optional `Ingress` + optional `ServiceAccount` for an application workload, following the
 `app.kubernetes.io/*` label conventions used by the Kubewekend and Bitnami
 Helm "common" libraries (`app.kubernetes.io/name`, `app.kubernetes.io/instance`,
 `app.kubernetes.io/managed-by: crossplane`).
@@ -36,14 +36,16 @@ Secret(s) they produce.
 | `image.repository` | `string` | yes | | Container image repository. |
 | `image.tag` | `string` | | `"latest"` | |
 | `image.pullPolicy` | `string` | | `"IfNotPresent"` | One of `Always`, `IfNotPresent`, `Never`. |
+| `imagePullSecrets` | `array<string>` | | `[]` | Names of existing Secrets (type `kubernetes.io/dockerconfigjson`) for pulling from private registries. Added to `spec.imagePullSecrets` on both the main Deployment and devSpace. The Secrets must already exist in the target namespace — this XR does not create them. |
 | `replicas` | `integer` | | `1` | |
 | `containerPort` | `integer` | | `8080` | |
+| `terminationGracePeriodSeconds` | `integer` | | `30` | Seconds to wait for graceful shutdown after SIGTERM before SIGKILL. Increase for apps with long-running requests, connection draining, or batch processing. |
 | `resources` | `object` | | | Passed through verbatim to the container's `resources` field (`requests`/`limits` × `cpu`/`memory`). |
 | `env` | `array<{name, value}>` | | `[]` | Plain (non-secret) environment variables. |
 | `envFrom` | `array<{secretRef\|configMapRef: {name}}>` | | `[]` | Additional `envFrom` sources, merged after the `secretsFrom.{app,database}`-managed `secretRef`s (if enabled). |
 | `podAnnotations` | `object<string, string>` | | `{}` | Annotations applied to the pod template (e.g. for Prometheus scraping). |
 | `deploymentAnnotations` | `object<string, string>` | | `{}` | Extra annotations merged onto the main `Deployment`'s `metadata.annotations`, alongside `wxops.cloud/template-id`, `wxops.cloud/repo-url`, and (if `reloader.enabled`) `reloader.stakater.com/auto`. |
-| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `devSpace`, `Service`, `Ingress`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
+| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `devSpace`, `Service`, `Ingress`, `ServiceAccount`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
 | `command` | `array<string>` | | | Optional container command override. |
 | `args` | `array<string>` | | | Optional container args override. |
 
@@ -57,6 +59,31 @@ Secret(s) they produce.
 | `rolloutStrategy.type` | `string` | `"RollingUpdate"` | One of `RollingUpdate`, `Recreate`. |
 | `rolloutStrategy.rollingUpdate.maxSurge` | `string\|integer` | `"25%"` | Only used when `type` is `RollingUpdate`. |
 | `rolloutStrategy.rollingUpdate.maxUnavailable` | `string\|integer` | `"25%"` | Only used when `type` is `RollingUpdate`. |
+
+### `serviceAccount`
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `serviceAccount.create` | `boolean` | `false` | If true, compose a new `ServiceAccount` in the target namespace. |
+| `serviceAccount.name` | `string` | `appName` (when `create: true`) | ServiceAccount name. When `create: false`, must reference an existing SA in the target namespace. If the entire `serviceAccount` section is omitted, the namespace default SA is used. |
+| `serviceAccount.annotations` | `object<string, string>` | `{}` | Annotations on the created SA (ignored when `create: false`). Use for workload identity bindings — e.g. `eks.amazonaws.com/role-arn` (IRSA), `iam.gke.io/gcp-service-account` (GCP WI). |
+
+### `securityContext`
+
+Pod-level and container-level security settings. Pod-level fields apply to
+all containers; container-level fields apply to the main app container (and
+devSpace container if enabled).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `securityContext.runAsNonRoot` | `boolean` | | Pod-level. Require all containers to run as non-root. Many clusters enforce this via admission policies. |
+| `securityContext.runAsUser` | `integer` | | Pod-level. UID to run all containers as. |
+| `securityContext.runAsGroup` | `integer` | | Pod-level. Primary GID for all containers. |
+| `securityContext.fsGroup` | `integer` | | Pod-level. GID applied to all mounted volumes. |
+| `securityContext.readOnlyRootFilesystem` | `boolean` | | Container-level. Mount the root filesystem as read-only. |
+| `securityContext.allowPrivilegeEscalation` | `boolean` | | Container-level. Whether the process can gain more privileges than its parent. Set to `false` for hardened workloads. |
+| `securityContext.capabilities.drop` | `array<string>` | `[]` | Container-level. Capabilities to drop. Use `["ALL"]` to drop all (recommended baseline). |
+| `securityContext.capabilities.add` | `array<string>` | `[]` | Container-level. Capabilities to add back (e.g. `["NET_BIND_SERVICE"]`). |
 
 ### `secretsFrom`
 
