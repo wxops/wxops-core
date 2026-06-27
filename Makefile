@@ -41,6 +41,14 @@ kcl-sync: ## Embed kcl/{pkg}/main.k into composition.yaml (run after editing KCL
 kcl-check: ## Fail if any composition.yaml is out of sync with its kcl/ source
 	@python3 .gitea/scripts/kcl-sync.py --check
 
+.PHONY: readme-sync
+readme-sync: ## Regenerate the README.md packages table from VERSIONS.yaml
+	@python3 .gitea/scripts/gen-readme-packages.py
+
+.PHONY: readme-check
+readme-check: ## Fail if README.md packages table is out of sync with VERSIONS.yaml
+	@python3 .gitea/scripts/gen-readme-packages.py --check
+
 # ── Lint & render ────────────────────────────────────────────────────────────
 
 .PHONY: lint

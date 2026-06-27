@@ -4,6 +4,7 @@ Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native p
 
 ## Packages
 
+<!-- packages-table-start -->
 | Package | Kind | Group | API Versions | Package Version |
 |---|---|---|---|---|
 | [`gitea-user`](package/gitea-user/) | `XGiteaUser` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
@@ -12,7 +13,8 @@ Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native p
 | [`gitea-repository`](package/gitea-repository/) | `XGiteaRepository` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.3` |
 | [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.3` |
-| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.3` |
+| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.5` |
+<!-- packages-table-end -->
 
 > `random-password` lives in `package/random-password/` as a utility composition but is not yet published as a standalone OCI package.
 
