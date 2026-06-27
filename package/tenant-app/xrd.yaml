@@ -228,20 +228,16 @@ spec:
 
                     # ── Container ────────────────────────────────────────────
                     image:
-                      type: object
-                      required:
-                        - repository
-                      properties:
-                        repository:
-                          type: string
-                          description: Container image repository.
-                        tag:
-                          type: string
-                          default: "latest"
-                        pullPolicy:
-                          type: string
-                          enum: ["Always", "IfNotPresent", "Never"]
-                          default: "IfNotPresent"
+                      type: string
+                      description: |
+                        Container image reference as a single string
+                        (repository:tag). e.g. ghcr.io/org/app:1.0.0.
+                        Use this form so Kustomize image-updater can
+                        target it directly.
+                    imagePullPolicy:
+                      type: string
+                      enum: ["Always", "IfNotPresent", "Never"]
+                      default: "IfNotPresent"
                     replicas:
                       type: integer
                       minimum: 0
@@ -419,13 +415,10 @@ spec:
                           minimum: 0
                           default: 0
                         image:
-                          type: object
-                          description: Optional image override for the dev pod. Defaults to the main image.
-                          properties:
-                            repository:
-                              type: string
-                            tag:
-                              type: string
+                          type: string
+                          description: |
+                            Optional image override for the dev pod
+                            (repository:tag). Defaults to the main image.
                         command:
                           type: array
                           default: ["sleep", "infinity"]

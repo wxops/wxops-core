@@ -74,7 +74,7 @@ commit on `defaultBranch`.
 ## 7. CI builds the image
 
 CI defined by the skeleton itself (pushed as part of step 6) builds and
-publishes the container image, producing the `image.repository`/`image.tag`
+publishes the container image, producing the `image` reference (`repository:tag`)
 used in step 8.
 
 ## 8. Create the application — `tenant-app`
@@ -91,9 +91,7 @@ spec:
     templateId: <templateId>                  # from step 2
     repository:
       url: <html_url from step 3>             # catalog link only
-    image:
-      repository: <built by CI from step 7>
-      tag: <built by CI from step 7>
+    image: <repository:tag built by CI from step 7>
 ```
 
 ## 9. (Optional) Wire database secrets

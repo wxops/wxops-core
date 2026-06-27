@@ -57,9 +57,8 @@ Inputs (via option("params").oxr.spec.parameters):
                       private registries. Added to pod spec on both the
                       main Deployment and devSpace. Default: [].
 
-  image.repository   string  Container image repository.
-  image.tag          string  Image tag. Default: "latest".
-  image.pullPolicy   string  Default: "IfNotPresent".
+  image              string  Container image (repository:tag). e.g. ghcr.io/org/app:1.0.0.
+  imagePullPolicy    string  Default: "IfNotPresent".
   replicas           int     Default: 1.
   containerPort      int     Default: 8080.
   resources          object  Passed through to container.resources.
@@ -151,8 +150,8 @@ Inputs (via option("params").oxr.spec.parameters):
                       Ingress of its own (zero external exposure). Intended
                       as a target for Telepresence/Mirrord.
   devSpace.replicas   int     Default: 0. Scale to 1 on-demand to debug.
-  devSpace.image.repository/tag  string  Optional override (defaults to
-                      the main image).
+  devSpace.image      string  Optional image override (repository:tag). Defaults to
+                      the main image.
   devSpace.command    [string] Default: ["sleep", "infinity"] — keeps the
                       pod alive for exec/port-forward without serving traffic.
 
@@ -235,7 +234,8 @@ _repoUrl = _get(_repo, "url", "")
 _commonAnnotations = ({"wxops.cloud/template-id" = _templateId} if _templateId != "" else {}) | ({"wxops.cloud/repo-url" = _repoUrl} if _repoUrl != "" else {})
 
 # ── Container / Deployment ─────────────────────────────────────────
-_img = params.image
+_imgStr = params.image
+_pullPolicy = _get(params, "imagePullPolicy", "IfNotPresent")
 containerPort = _get(params, "containerPort", 8080)
 replicas = _get(params, "replicas", 1)
 
@@ -325,8 +325,8 @@ _startupProbe = {
 
 _base_container = {
     name = appName
-    image = "{}:{}".format(_img.repository, _get(_img, "tag", "latest"))
-    imagePullPolicy = _get(_img, "pullPolicy", "IfNotPresent")
+    image = _imgStr
+    imagePullPolicy = _pullPolicy
     ports = [{containerPort = containerPort}]
     env = _env
 }
@@ -387,15 +387,14 @@ _deployment = {
 _devSpace = params.devSpace if "devSpace" in params else {}
 devSpaceEnabled = _get(_devSpace, "enabled", False)
 devSpaceReplicas = _get(_devSpace, "replicas", 0)
-_devImg = _devSpace.image if "image" in _devSpace else {}
 _devCommand = _get(_devSpace, "command", ["sleep", "infinity"])
 
 _devLabels = labels | {"app.kubernetes.io/component" = "devspace"}
 
 _dev_container = {
     name = appName + "-dev"
-    image = "{}:{}".format(_get(_devImg, "repository", _img.repository), _get(_devImg, "tag", _get(_img, "tag", "latest")))
-    imagePullPolicy = _get(_img, "pullPolicy", "IfNotPresent")
+    image = _get(_devSpace, "image", _imgStr)
+    imagePullPolicy = _pullPolicy
     ports = [{containerPort = containerPort}]
     env = _env
     command = _devCommand

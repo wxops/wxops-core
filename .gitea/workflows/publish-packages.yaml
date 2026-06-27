@@ -9,6 +9,9 @@ env:
   # Override via repository variable: Settings → Variables → REGISTRY
   REGISTRY: ${{ vars.REGISTRY || 'ghcr.io/wxops' }}
 
+permissions:
+  contents: write   # changelog commit + release creation
+
 jobs:
   validate:
     name: Validate packages
@@ -153,7 +156,7 @@ jobs:
           body_path: /tmp/release-body.md
           draft: false
           prerelease: false
-          token: ${{ secrets.REPO_ACCESS_TOKEN }}
+          token: ${{ secrets.GITEA_TOKEN }}
 
   update-configurations:
     name: Update install manifest versions

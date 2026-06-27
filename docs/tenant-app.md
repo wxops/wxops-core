@@ -33,9 +33,8 @@ Secret(s) they produce.
 | `appFlavor` | `string` | | `"webapp"` | One of `webapp`, `ai`, `ai-webapp`, `geo-webapp`, `search-webapp`. Applied as the `wxops.cloud/app-flavor` label on created resources — purely metadata for platform-level automation (e.g. a separate `XTenantDatabase` claim choosing `pgvector`/`postgis` extensions, or Kyverno generate-policies) to key off. Does not affect any resource composed by this XR. |
 | `templateId` | `string` | | | Backstage/IDP software-template identifier this app was scaffolded from. Applied as the `wxops.cloud/template-id` annotation on all composed resources — catalog-linking metadata only. |
 | `repository.url` | `string` | | | URL of the application's source repository (e.g. a Gitea repo created or imported by the platform/portal — `tenant-app` doesn't manage repositories). Applied as the `wxops.cloud/repo-url` annotation on all composed resources. |
-| `image.repository` | `string` | yes | | Container image repository. |
-| `image.tag` | `string` | | `"latest"` | |
-| `image.pullPolicy` | `string` | | `"IfNotPresent"` | One of `Always`, `IfNotPresent`, `Never`. |
+| `image` | `string` | yes | | Container image reference (`repository:tag`). e.g. `ghcr.io/org/app:1.0.0`. Use this single-string form so Kustomize image-updater can target it directly. |
+| `imagePullPolicy` | `string` | | `"IfNotPresent"` | One of `Always`, `IfNotPresent`, `Never`. |
 | `imagePullSecrets` | `array<string>` | | `[]` | Names of existing Secrets (type `kubernetes.io/dockerconfigjson`) for pulling from private registries. Added to `spec.imagePullSecrets` on both the main Deployment and devSpace. The Secrets must already exist in the target namespace — this XR does not create them. |
 | `replicas` | `integer` | | `1` | |
 | `containerPort` | `integer` | | `8080` | |
@@ -118,8 +117,7 @@ on-demand and point Telepresence/Mirrord at
 |---|---|---|---|
 | `devSpace.enabled` | `boolean` | `false` | |
 | `devSpace.replicas` | `integer` | `0` | Scale to `1` on-demand to start the debug pod. |
-| `devSpace.image.repository` | `string` | main `image.repository` | Optional override (e.g. a debug image with extra tooling). |
-| `devSpace.image.tag` | `string` | main `image.tag` | |
+| `devSpace.image` | `string` | main `image` | Optional image override (`repository:tag`). e.g. `ghcr.io/org/app:debug`. Defaults to the main image. |
 | `devSpace.command` | `array<string>` | `["sleep", "infinity"]` | Keeps the pod alive for `kubectl exec`/port-forward without serving traffic itself. |
 
 ### `service`

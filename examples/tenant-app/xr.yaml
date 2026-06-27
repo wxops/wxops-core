@@ -13,9 +13,7 @@ spec:
     # templateId: nodejs-service  # optional. Backstage/IDP template id — catalog metadata only
     # repository:
     #   url: https://gitea.example.com/rocket-team/payment-api  # catalog metadata only
-    image:
-      repository: ghcr.io/rocket-team/payment-api
-      tag: "1.4.0"
+    image: ghcr.io/rocket-team/payment-api:1.4.0
     # imagePullSecrets:
     #   - my-registry-creds    # existing Secret (kubernetes.io/dockerconfigjson)
     #                           # must exist in the target namespace
@@ -87,9 +85,7 @@ spec:
     # devSpace:
     #   enabled: true
     #   replicas: 0          # default — scale to 1 on-demand
-    #   # image:
-    #   #   repository: ghcr.io/rocket-team/payment-api
-    #   #   tag: debug
+    #   # image: ghcr.io/rocket-team/payment-api:debug
     #   # command: ["sleep", "infinity"]  # default
 
     # service:

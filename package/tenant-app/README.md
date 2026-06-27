@@ -59,9 +59,7 @@ spec:
   parameters:
     appName: payment-api
     namespace: rocket-team-production
-    image:
-      repository: ghcr.io/rocket-team/payment-api
-      tag: "1.4.0"
+    image: ghcr.io/rocket-team/payment-api:1.4.0
     imagePullSecrets:
       - my-registry-creds
     serviceAccount:
