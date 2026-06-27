@@ -15,6 +15,17 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.6] — 2026-06-27
+
+### Chores
+
+- Bump version tenant-app ([`9ddb383`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/9ddb383a0c57169607faaf143851a45e21fa8533))
+- Support raw image string for tenant-app xrds ([`d24b9c0`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/d24b9c0b1cb1d9dc2d35b2b2abce0ba81b908e4b))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.6/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.6/VERSIONS.yaml)
+🔍 [Diff vs 0.2.5](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.5...v0.2.6)
 ## [0.2.5] — 2026-06-24
 
 ### Chores
@@ -134,6 +145,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.6]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.6
 [0.2.5]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.5
 [0.2.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.4
 [0.2.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.3
@@ -142,5 +154,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.5...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.6...HEAD
 
