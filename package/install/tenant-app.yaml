@@ -5,6 +5,6 @@ metadata:
   annotations:
     meta.crossplane.io/version: v0.1.0
 spec:
-  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-tenant-app:v0.1.4
+  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-tenant-app:v0.1.5
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
