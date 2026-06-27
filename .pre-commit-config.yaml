@@ -13,7 +13,9 @@
 #   pre-commit  2. YAML style          (yamllint)
 #               3. Kubernetes schema   (kubeconform)
 #               4. Crossplane build    (crossplane xpkg build)
-#               5. Package version bump (VERSIONS.yaml check)
+#               5. KCL drift check     (composition.yaml vs kcl/ source)
+#               6. Package version bump (VERSIONS.yaml check)
+#               7. README packages     (README.md table vs VERSIONS.yaml)
 #
 # Allowed commit types (must stay in sync with cliff.toml commit_parsers):
 #   feat | fix | perf | refactor | docs | test | chore | revert
@@ -137,4 +139,19 @@ repos:
         language: script
         entry: .gitea/scripts/check-versions-bump.sh
         pass_filenames: false
-        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository|platform-database-clusters|tenant-database)/.*\.yaml$
+        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository|platform-database-clusters|tenant-database|tenant-app)/.*\.yaml$
+
+  # ── README packages table sync ────────────────────────────────────────────────
+  # Runs after versions-bump-check so the table always reflects a version that
+  # has already been confirmed as bumped.
+  # If you add a package, bump a version, or add an API version, run
+  # `make readme-sync` before committing.
+  - repo: local
+    hooks:
+      - id: readme-packages-table
+        name: README packages table in sync with VERSIONS.yaml
+        language: python
+        additional_dependencies: [pyyaml]
+        entry: python3 .gitea/scripts/gen-readme-packages.py --check
+        pass_filenames: false
+        files: ^(VERSIONS\.yaml|README\.md|package/[^/]+/xrd\.yaml)$
