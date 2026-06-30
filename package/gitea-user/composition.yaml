@@ -72,6 +72,10 @@ spec:
                       type    = string
                       default = "private"
                     }
+                    variable "allow_create_organization" {
+                      type    = bool
+                      default = false
+                    }
 
                     variable "gitea_token" {
                       type      = string
@@ -91,17 +95,18 @@ spec:
                     }
 
                     resource "gitea_user" "this" {
-                      username             = var.username
-                      login_name           = var.username
-                      email                = var.email
-                      password             = random_password.initial.result
-                      full_name            = var.full_name
-                      admin                = var.admin
-                      must_change_password = var.must_change_password
-                      visibility           = var.visibility
+                      username                  = var.username
+                      login_name                = var.username
+                      email                     = var.email
+                      password                  = random_password.initial.result
+                      full_name                 = var.full_name
+                      admin                     = var.admin
+                      must_change_password      = var.must_change_password
+                      visibility                = var.visibility
+                      allow_create_organization = var.allow_create_organization
                       # Requires a working SMTP server configured in Gitea.
                       # Sends a welcome email with login credentials on account creation.
-                      send_notification    = true
+                      send_notification         = true
                     }
 
                     output "user_id"  { value = gitea_user.this.id }
@@ -132,6 +137,8 @@ spec:
                       value: "true"
                     - key: visibility
                       value: "private"
+                    - key: allow_create_organization
+                      value: "false"
 
                   varFiles:
                     - source: SecretKey
@@ -213,6 +220,14 @@ spec:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.parameters.visibility
                 toFieldPath: spec.forProvider.vars[9].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.allowCreateOrganization
+                toFieldPath: spec.forProvider.vars[10].value
                 transforms:
                   - type: convert
                     convert:

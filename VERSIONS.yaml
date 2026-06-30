@@ -17,7 +17,7 @@ packages:
 
   gitea-user:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -25,7 +25,7 @@ packages:
 
   gitea-org:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -33,7 +33,7 @@ packages:
 
   gitea-team:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1

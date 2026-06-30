@@ -73,6 +73,10 @@ spec:
                       type: boolean
                       default: true
                       description: Include special characters in the auto-generated password.
+                    allowCreateOrganization:
+                      type: boolean
+                      default: false
+                      description: Allow the user to create organizations.
                     credentialsSecretRef:
                       type: object
                       description: |

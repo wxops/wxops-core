@@ -55,6 +55,12 @@ spec:
                       type: string
                       default: public
                       enum: [public, limited, private]
+                    repoAdminChangeTeamAccess:
+                      type: boolean
+                      default: false
+                      description: |
+                        Allow repository admins to add and remove teams from repositories,
+                        even if they are not organization admins.
                     credentialsSecretRef:
                       type: object
                       description: |

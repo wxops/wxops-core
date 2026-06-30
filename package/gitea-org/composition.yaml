@@ -63,6 +63,10 @@ spec:
                       type    = string
                       default = "public"
                     }
+                    variable "repo_admin_change_team_access" {
+                      type    = bool
+                      default = false
+                    }
 
                     variable "gitea_token" {
                       type      = string
@@ -76,12 +80,13 @@ spec:
                     }
 
                     resource "gitea_org" "this" {
-                      name        = var.org_name
-                      full_name   = var.full_name
-                      description = var.description
-                      website     = var.website
-                      location    = var.location
-                      visibility  = var.visibility
+                      name                          = var.org_name
+                      full_name                     = var.full_name
+                      description                   = var.description
+                      website                       = var.website
+                      location                      = var.location
+                      visibility                    = var.visibility
+                      repo_admin_change_team_access = var.repo_admin_change_team_access
                     }
 
                     output "org_id"   { value = gitea_org.this.id }
@@ -103,6 +108,8 @@ spec:
                     - key: visibility
                       value: public
                     - key: insecure
+                      value: "false"
+                    - key: repo_admin_change_team_access
                       value: "false"
 
                   varFiles:
@@ -157,6 +164,14 @@ spec:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.parameters.insecure
                 toFieldPath: spec.forProvider.vars[7].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.repoAdminChangeTeamAccess
+                toFieldPath: spec.forProvider.vars[8].value
                 transforms:
                   - type: convert
                     convert:

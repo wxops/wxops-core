@@ -17,6 +17,8 @@ spec:
     # passwordSpecial: true
     # visibility defaults to private, which is recommended for user accounts.
     # visibility: "private"
+    # allowCreateOrganization defaults to false.
+    # allowCreateOrganization: false
     credentialsSecretRef:
       name: gitea-credentials
       namespace: crossplane-system

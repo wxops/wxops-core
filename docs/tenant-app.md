@@ -111,7 +111,7 @@ main one — same `image`/`env`/`envFrom`, scaled to `0` by default and with
 **no `Service`/`Ingress` of its own** (zero external exposure). Scale it up
 on-demand and point Telepresence/Mirrord at
 `deployment/<appName>-dev` to debug with the same environment as production
-— see [local-dev-tunneling.md](local-dev-tunneling.md).
+— see [devspace.md](devspace.md).
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -257,6 +257,6 @@ See [`examples/tenant-app/xr.yaml`](../examples/tenant-app/xr.yaml).
 
 ## See also
 
-- [Local dev tunneling (Telepresence / Mirrord)](local-dev-tunneling.md) —
-  how to connect your local dev environment to a `tenant-app`'s namespace
-  for live-coding against shared cluster resources.
+- [DevSpace — In-Cluster Developer Environment](devspace.md) —
+  exec, file sync, traffic mirroring, A/B testing, AI agent workflow,
+  and SRE Agent with the devSpace debug twin.
