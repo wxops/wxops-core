@@ -15,6 +15,17 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.2.7] — 2026-06-30
+
+### Chores
+
+- Support gitea operation for user org and team easier modification and introduce new info phase 3 ([`30068f4`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/30068f4ffb51bb5128b0b681682a6659c1551b06))
+- Update readme and support matrix package generator ([`ecfc067`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/ecfc067935999ceaa37b47ebb361a342db547af7))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.7/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.7/VERSIONS.yaml)
+🔍 [Diff vs 0.2.6](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.6...v0.2.7)
 ## [0.2.6] — 2026-06-27
 
 ### Chores
@@ -145,6 +156,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.2.7]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.7
 [0.2.6]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.6
 [0.2.5]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.5
 [0.2.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.4
@@ -154,5 +166,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.6...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.7...HEAD
 
