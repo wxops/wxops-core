@@ -10,6 +10,11 @@ spec:
     description: Backend engineers
     permission: write
     units: "repo.code,repo.issues,repo.pulls,repo.releases"
+    # Enable Actions and Packages units via direct Gitea API call.
+    # enableActions: false
+    # actionsReadOnly: false   # cap repo.actions at read, regardless of permission
+    # enablePackages: false
+    # packagesReadOnly: false  # cap repo.packages at read, regardless of permission
     # Membership is reconciled on every sync.
     # Add or remove a username here and Crossplane will apply the change.
     members: "alice,bob"

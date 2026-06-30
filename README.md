@@ -7,9 +7,9 @@ Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native p
 <!-- packages-table-start -->
 | Package | Kind | Group | API Versions | Package Version |
 |---|---|---|---|---|
-| [`gitea-user`](package/gitea-user/) | `XGiteaUser` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
-| [`gitea-org`](package/gitea-org/) | `XGiteaOrg` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
-| [`gitea-team`](package/gitea-team/) | `XGiteaTeam` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
+| [`gitea-user`](package/gitea-user/) | `XGiteaUser` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.1` |
+| [`gitea-org`](package/gitea-org/) | `XGiteaOrg` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.1` |
+| [`gitea-team`](package/gitea-team/) | `XGiteaTeam` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.1` |
 | [`gitea-repository`](package/gitea-repository/) | `XGiteaRepository` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.3` |
 | [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.3` |

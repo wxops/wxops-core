@@ -23,6 +23,7 @@ Manages a Gitea organisation with visibility and metadata.
 | `website` | `string` | | `""` | Organization website URL. |
 | `location` | `string` | | `""` | Organization location. |
 | `visibility` | `string` (`public`, `limited`, `private`) | | `public` | Organization visibility. |
+| `repoAdminChangeTeamAccess` | `boolean` | | `false` | Allow repository admins to add and remove teams from repositories, even if they are not organization admins. |
 | `credentialsSecretRef` | `object` | yes | | Secret holding the Gitea admin token in tfvars format: `gitea_token = "admin-token"`. |
 | `credentialsSecretRef.name` | `string` | yes | | Secret name. |
 | `credentialsSecretRef.namespace` | `string` | yes | | Secret namespace. |

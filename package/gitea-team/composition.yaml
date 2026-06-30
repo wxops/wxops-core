@@ -34,6 +34,10 @@ spec:
                           source  = "go-gitea/gitea"
                           version = "~> 0.7.0"
                         }
+                        null = {
+                          source  = "hashicorp/null"
+                          version = "~> 3.0"
+                        }
                       }
                     }
 
@@ -68,6 +72,22 @@ spec:
                     variable "members" {
                       type    = string
                       default = ""
+                    }
+                    variable "enable_actions" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "actions_read_only" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "enable_packages" {
+                      type    = bool
+                      default = false
+                    }
+                    variable "packages_read_only" {
+                      type    = bool
+                      default = false
                     }
 
                     variable "gitea_token" {
@@ -105,6 +125,90 @@ spec:
                       username = each.key
                     }
 
+                    # repo.actions and repo.packages are not in the Terraform provider
+                    # unit enum (v0.7.x), so they are applied via direct Gitea API call.
+                    # When a readOnly flag is active, switches to units_map so that unit
+                    # gets "read" while all base units keep the configured permission.
+                    resource "null_resource" "extended_units" {
+                      count = (var.enable_actions || var.enable_packages) ? 1 : 0
+
+                      triggers = {
+                        team_id            = gitea_team.this.id
+                        units              = var.units
+                        permission         = var.permission
+                        enable_actions     = tostring(var.enable_actions)
+                        enable_packages    = tostring(var.enable_packages)
+                        actions_read_only  = tostring(var.actions_read_only)
+                        packages_read_only = tostring(var.packages_read_only)
+                      }
+
+                      provisioner "local-exec" {
+                        environment = {
+                          GITEA_TOKEN        = var.gitea_token
+                          GITEA_URL          = var.gitea_url
+                          TEAM_ID            = tostring(gitea_team.this.id)
+                          BASE_UNITS         = var.units
+                          PERMISSION         = var.permission
+                          ENABLE_ACTIONS     = tostring(var.enable_actions)
+                          ENABLE_PACKAGES    = tostring(var.enable_packages)
+                          ACTIONS_READ_ONLY  = tostring(var.actions_read_only)
+                          PACKAGES_READ_ONLY = tostring(var.packages_read_only)
+                          INSECURE           = tostring(var.insecure)
+                        }
+                        command = <<-EOT
+                          ACTIONS_PERM=""
+                          [ "$ENABLE_ACTIONS" = "true" ] && ACTIONS_PERM="$PERMISSION"
+                          [ "$ENABLE_ACTIONS" = "true" ] && [ "$ACTIONS_READ_ONLY" = "true" ] && ACTIONS_PERM="read"
+                          PACKAGES_PERM=""
+                          [ "$ENABLE_PACKAGES" = "true" ] && PACKAGES_PERM="$PERMISSION"
+                          [ "$ENABLE_PACKAGES" = "true" ] && [ "$PACKAGES_READ_ONLY" = "true" ] && PACKAGES_PERM="read"
+                          USE_MAP="false"
+                          [ "$ACTIONS_READ_ONLY" = "true" ] && [ "$ENABLE_ACTIONS" = "true" ] && USE_MAP="true"
+                          [ "$PACKAGES_READ_ONLY" = "true" ] && [ "$ENABLE_PACKAGES" = "true" ] && USE_MAP="true"
+                          if [ "$USE_MAP" = "true" ]; then
+                            MAP="{"
+                            SEP=""
+                            for UNIT in $(echo "$BASE_UNITS" | tr ',' ' '); do
+                              [ -z "$UNIT" ] && continue
+                              MAP=$MAP$SEP'"'$UNIT'":"'$PERMISSION'"'
+                              SEP=","
+                            done
+                            if [ -n "$ACTIONS_PERM" ]; then
+                              MAP=$MAP$SEP'"repo.actions":"'$ACTIONS_PERM'"'
+                              SEP=","
+                            fi
+                            if [ -n "$PACKAGES_PERM" ]; then
+                              MAP=$MAP$SEP'"repo.packages":"'$PACKAGES_PERM'"'
+                            fi
+                            MAP=$MAP"}"
+                            BODY='{"units_map":'$MAP'}'
+                          else
+                            UNITS="$BASE_UNITS"
+                            [ "$ENABLE_ACTIONS" = "true" ] && UNITS="$UNITS,repo.actions"
+                            [ "$ENABLE_PACKAGES" = "true" ] && UNITS="$UNITS,repo.packages"
+                            UNITS_JSON=$(echo "$UNITS" | awk '{
+                              n = split($0, a, ",")
+                              s = "["
+                              for (i = 1; i <= n; i++) {
+                                gsub(/^[[:space:]]+|[[:space:]]+$/, "", a[i])
+                                s = s "\"" a[i] "\""
+                                if (i < n) s = s ","
+                              }
+                              print s "]"
+                            }')
+                            BODY='{"units":'$UNITS_JSON'}'
+                          fi
+                          CURL_FLAGS="-sf"
+                          [ "$INSECURE" = "true" ] && CURL_FLAGS="$CURL_FLAGS -k"
+                          curl $CURL_FLAGS -X PATCH \
+                            "$GITEA_URL/api/v1/teams/$TEAM_ID" \
+                            -H "Authorization: token $GITEA_TOKEN" \
+                            -H "Content-Type: application/json" \
+                            -d "$BODY"
+                        EOT
+                      }
+                    }
+
                     output "team_id"   { value = gitea_team.this.id }
                     output "team_name" { value = gitea_team.this.name }
 
@@ -128,6 +232,14 @@ spec:
                     - key: members
                       value: ""
                     - key: insecure
+                      value: "false"
+                    - key: enable_actions
+                      value: "false"
+                    - key: actions_read_only
+                      value: "false"
+                    - key: enable_packages
+                      value: "false"
+                    - key: packages_read_only
                       value: "false"
 
                   varFiles:
@@ -198,6 +310,38 @@ spec:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.parameters.insecure
                 toFieldPath: spec.forProvider.vars[9].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.enableActions
+                toFieldPath: spec.forProvider.vars[10].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.actionsReadOnly
+                toFieldPath: spec.forProvider.vars[11].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.enablePackages
+                toFieldPath: spec.forProvider.vars[12].value
+                transforms:
+                  - type: convert
+                    convert:
+                      toType: string
+
+              - type: FromCompositeFieldPath
+                fromFieldPath: spec.parameters.packagesReadOnly
+                toFieldPath: spec.forProvider.vars[13].value
                 transforms:
                   - type: convert
                     convert:

@@ -25,6 +25,7 @@ Manages a single Gitea user lifecycle (create / update / delete).
 | `visibility` | `string` (`public`, `limited`, `private`) | | `"private"` | Account visibility level. A private user won't appear in the member list of an organization. |
 | `passwordLength` | `integer` (16–128) | | `24` | Length of the auto-generated initial password. |
 | `passwordSpecial` | `boolean` | | `true` | Include special characters in the auto-generated password. |
+| `allowCreateOrganization` | `boolean` | | `false` | Allow the user to create organizations. |
 | `credentialsSecretRef` | `object` | yes | | Secret holding the Gitea admin token in tfvars format: `gitea_token = "admin-api-token"`. No password field is needed — the initial user password is generated automatically and emailed to the user via Gitea SMTP. |
 | `credentialsSecretRef.name` | `string` | yes | | Secret name. |
 | `credentialsSecretRef.namespace` | `string` | yes | | Secret namespace. |

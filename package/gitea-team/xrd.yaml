@@ -55,7 +55,38 @@ spec:
                       description: |
                         Comma-separated repository feature units the team has access to.
                         Valid values: repo.code, repo.issues, repo.ext_issues, repo.wiki,
-                        repo.pulls, repo.releases, repo.projects, repo.ext_wiki
+                        repo.pulls, repo.releases, repo.projects, repo.ext_wiki.
+                        Use enableActions and enablePackages for those units instead of
+                        listing them here — they are applied via direct API call.
+                    enableActions:
+                      type: boolean
+                      default: false
+                      description: |
+                        Grant the team access to the Actions (CI/CD) unit. Applied via
+                        Gitea API because the Terraform provider does not support this unit.
+                    actionsReadOnly:
+                      type: boolean
+                      default: false
+                      description: |
+                        Force repo.actions to read-only, overriding the base permission.
+                        Only effective when enableActions is true. When set, the PATCH
+                        uses units_map so repo.actions gets "read" while all base units
+                        retain the configured permission level.
+                    enablePackages:
+                      type: boolean
+                      default: false
+                      description: |
+                        Grant the team access to the Packages (container/artifact registry)
+                        unit. Applied via Gitea API because the Terraform provider does not
+                        support this unit.
+                    packagesReadOnly:
+                      type: boolean
+                      default: false
+                      description: |
+                        Force repo.packages to read-only, overriding the base permission.
+                        Only effective when enablePackages is true. When set, the PATCH
+                        uses units_map so repo.packages gets "read" while all base units
+                        retain the configured permission level.
                     includeAllRepositories:
                       type: boolean
                       default: false
