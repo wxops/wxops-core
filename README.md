@@ -1,6 +1,6 @@
 # W'xOps Core
 
-Control-plane "brain" of W'xOps. Exposes Gitea management as Kubernetes-native platform APIs via [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages backed by `provider-terraform`.
+Control-plane "brain" of W'xOps. Exposes Gitea management, PostgreSQL database provisioning, and tenant application scaffolding (with Darlane in-cluster developer workspaces) as Kubernetes-native platform APIs via [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages backed by `provider-terraform`, `provider-kubernetes`, and `function-kcl`.
 
 ## Packages
 

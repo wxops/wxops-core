@@ -27,7 +27,7 @@ Secret(s) they produce.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
-| `appName` | `string` | yes | | Application name. Used as the name of the `Deployment`/`Service`/`Ingress` and as the value of the `app.kubernetes.io/name` and `app.kubernetes.io/instance` labels. |
+| `appName` | `string` | yes | | Application name. Used as the name of the `Deployment`/`Service`/`IngressRoute` and as the value of the `app.kubernetes.io/name` and `app.kubernetes.io/instance` labels. |
 | `namespace` | `string` | yes | | Target namespace for all resources created by this XR. |
 | `environment` | `string` | | `"dev"` | One of `dev`, `staging`, `prod`. Applied as the `wxops.cloud/environment` label on created resources — purely metadata for dashboards, cost reports, and Kyverno generate-policies. Pairs with an ArgoCD ApplicationSet matrix generator (apps × environments). |
 | `appFlavor` | `string` | | `"webapp"` | One of `webapp`, `ai`, `ai-webapp`, `geo-webapp`, `search-webapp`. Applied as the `wxops.cloud/app-flavor` label on created resources — purely metadata for platform-level automation (e.g. a separate `XTenantDatabase` claim choosing `pgvector`/`postgis` extensions, or Kyverno generate-policies) to key off. Does not affect any resource composed by this XR. |
@@ -44,7 +44,7 @@ Secret(s) they produce.
 | `envFrom` | `array<{secretRef\|configMapRef: {name}}>` | | `[]` | Additional `envFrom` sources, merged after the `secretsFrom.{app,database}`-managed `secretRef`s (if enabled). |
 | `podAnnotations` | `object<string, string>` | | `{}` | Annotations applied to the pod template (e.g. for Prometheus scraping). |
 | `deploymentAnnotations` | `object<string, string>` | | `{}` | Extra annotations merged onto the main `Deployment`'s `metadata.annotations`, alongside `wxops.cloud/template-id`, `wxops.cloud/repo-url`, and (if `reloader.enabled`) `reloader.stakater.com/auto`. |
-| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `darlane`, `Service`, `Ingress`, `ServiceAccount`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
+| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `darlane`, `Service`, `IngressRoute`, `ServiceAccount`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
 | `command` | `array<string>` | — | image default | Overrides the container `ENTRYPOINT`. Omit to use the image's built-in entrypoint. Set independently of `args` — Kubernetes applies the same override semantics as a pod spec `command` field. |
 | `args` | `array<string>` | — | image default | Overrides the container `CMD`. Can be set without `command` (passes args to the image's own entrypoint). Combined with `command`, both are required to fully replace entrypoint + args. |
 
@@ -139,7 +139,7 @@ the listed keys are mounted, at the given relative paths inside `mountPath`.
 
 If enabled, a second `<appName>-dev` Deployment is created alongside the
 main one — same `image`/`env`/`envFrom`/secrets, scaled to `0` by default
-and with **no `Service`/`Ingress` of its own** (zero external exposure).
+and with **no `Service`/`IngressRoute` of its own** (zero external exposure).
 Scale it up on-demand, sync code with mutagen, or route real traffic via
 `trafficWeight` for A/B testing and feature flags. Use `mirrord` CLI directly
 against the darlane pod for local development with real cluster env and secrets.
@@ -160,8 +160,8 @@ See [darlane.md](darlane.md) for the full developer guide.
 | `darlane.securityContext` | `object` | — | Security context overrides (`runAsUser`, `runAsGroup`, `readOnlyRootFilesystem`, etc). Applied on top of main app `securityContext`. `readOnlyRootFilesystem` defaults to `false` for darlane so `apt`/`pip` installs work without a custom image. |
 | `darlane.productionOverride` | `boolean` | `false` | Required when `environment: prod` to enable darlane. Double opt-in — visible in XR diffs and PRs. |
 | `darlane.ttl` | `string` | — | Adds `wxops.cloud/darlane-ttl` annotation to the dev Deployment (e.g. `"4h"`). Enforcement is a separate Kyverno policy. |
-| `darlane.trafficWeight` | `integer` | `0` | When `> 0` (and `ingress.enabled: true`), emits a `ClusterIP` Service for the darlane pod and a Traefik `TraefikService` weighted split. The Ingress backend switches to the `TraefikService` so real user traffic is split. `0` = debug only · `1–99` = A/B split · `100` = full canary. Requires Traefik with `TraefikService` CRD. |
-| `darlane.telemetryPort` | `integer` | — | When set, emits a `ClusterIP` Service named `{appName}-dev-telemetry` on this port. Provides stable in-cluster DNS for the OTEL collector, Prometheus, or any secondary port the darlane pod exposes. Common values: `4317` (OTEL gRPC), `4318` (OTEL HTTP), `9090` (Prometheus). Combine with `trafficWeight` for side-by-side A/B observability — one scrape target per version. |
+| `darlane.trafficWeight` | `integer` | `0` | When `> 0` (and `ingress.enabled: true`), emits a `ClusterIP` Service for the darlane pod and a Traefik `TraefikService` weighted split. The `IngressRoute` backend switches to the `TraefikService` so real user traffic is split — zero downtime, same Object updated in-place. `0` = debug only · `1–99` = A/B split · `100` = full canary. Requires Traefik with `TraefikService` CRD. |
+| `darlane.telemetryPort` | `integer` | — | When set, emits a `ClusterIP` Service named `{appName}-darlane-telemetry` on this port. Provides stable in-cluster DNS for the OTEL collector, Prometheus, or any secondary port the darlane pod exposes. Common values: `4317` (OTEL gRPC), `4318` (OTEL HTTP), `9090` (Prometheus). Combine with `trafficWeight` for side-by-side A/B observability — one scrape target per version. |
 
 #### `darlane.volumes` — volumes
 
