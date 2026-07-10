@@ -1,7 +1,7 @@
 # XTenantApp
 
 Tenant application scaffold — provisions a `Deployment` + `Service` +
-optional `Ingress` + optional `ServiceAccount` for an application workload, following the
+optional `IngressRoute` + optional `ServiceAccount` for an application workload, following the
 `app.kubernetes.io/*` label conventions used by the Kubewekend and Bitnami
 Helm "common" libraries (`app.kubernetes.io/name`, `app.kubernetes.io/instance`,
 `app.kubernetes.io/managed-by: crossplane`).
@@ -35,7 +35,7 @@ Secret(s) they produce.
 | `repository.url` | `string` | | | URL of the application's source repository (e.g. a Gitea repo created or imported by the platform/portal — `tenant-app` doesn't manage repositories). Applied as the `wxops.cloud/repo-url` annotation on all composed resources. |
 | `image` | `string` | yes | | Container image reference (`repository:tag`). e.g. `ghcr.io/org/app:1.0.0`. Use this single-string form so Kustomize image-updater can target it directly. |
 | `imagePullPolicy` | `string` | | `"IfNotPresent"` | One of `Always`, `IfNotPresent`, `Never`. |
-| `imagePullSecrets` | `array<string>` | | `[]` | Names of existing Secrets (type `kubernetes.io/dockerconfigjson`) for pulling from private registries. Added to `spec.imagePullSecrets` on both the main Deployment and devSpace. The Secrets must already exist in the target namespace — this XR does not create them. |
+| `imagePullSecrets` | `array<string>` | | `[]` | Names of existing Secrets (type `kubernetes.io/dockerconfigjson`) for pulling from private registries. Added to `spec.imagePullSecrets` on both the main Deployment and darlane. The Secrets must already exist in the target namespace — this XR does not create them. |
 | `replicas` | `integer` | | `1` | |
 | `containerPort` | `integer` | | `8080` | |
 | `terminationGracePeriodSeconds` | `integer` | | `30` | Seconds to wait for graceful shutdown after SIGTERM before SIGKILL. Increase for apps with long-running requests, connection draining, or batch processing. |
@@ -44,9 +44,9 @@ Secret(s) they produce.
 | `envFrom` | `array<{secretRef\|configMapRef: {name}}>` | | `[]` | Additional `envFrom` sources, merged after the `secretsFrom.{app,database}`-managed `secretRef`s (if enabled). |
 | `podAnnotations` | `object<string, string>` | | `{}` | Annotations applied to the pod template (e.g. for Prometheus scraping). |
 | `deploymentAnnotations` | `object<string, string>` | | `{}` | Extra annotations merged onto the main `Deployment`'s `metadata.annotations`, alongside `wxops.cloud/template-id`, `wxops.cloud/repo-url`, and (if `reloader.enabled`) `reloader.stakater.com/auto`. |
-| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `devSpace`, `Service`, `Ingress`, `ServiceAccount`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
-| `command` | `array<string>` | | | Optional container command override. |
-| `args` | `array<string>` | | | Optional container args override. |
+| `labels` | `object<string, string>` | | `{}` | Extra labels merged onto all composed resources (`Deployment`, `darlane`, `Service`, `Ingress`, `ServiceAccount`). The standard `app.kubernetes.io/*` and `wxops.cloud/*` labels always take precedence — they cannot be overridden, since selectors depend on them. |
+| `command` | `array<string>` | — | image default | Overrides the container `ENTRYPOINT`. Omit to use the image's built-in entrypoint. Set independently of `args` — Kubernetes applies the same override semantics as a pod spec `command` field. |
+| `args` | `array<string>` | — | image default | Overrides the container `CMD`. Can be set without `command` (passes args to the image's own entrypoint). Combined with `command`, both are required to fully replace entrypoint + args. |
 
 ### `rolloutStrategy`
 
@@ -71,7 +71,7 @@ Secret(s) they produce.
 
 Pod-level and container-level security settings. Pod-level fields apply to
 all containers; container-level fields apply to the main app container (and
-devSpace container if enabled).
+darlane container if enabled).
 
 | Field | Type | Default | Description |
 |---|---|---|---|
@@ -104,21 +104,97 @@ Deployment will fail to start until it's created).
 |---|---|---|---|
 | `reloader.enabled` | `boolean` | `false` | If true, adds `reloader.stakater.com/auto: "true"` to the `Deployment`'s annotations, triggering a rolling restart via the Reloader controller when referenced ConfigMaps/Secrets change. Requires Reloader installed in-cluster. |
 
-### `devSpace` (debug "twin" Deployment)
+### `volumes` — storage
 
-If enabled, a second `<appName>-dev` Deployment is created alongside the
-main one — same `image`/`env`/`envFrom`, scaled to `0` by default and with
-**no `Service`/`Ingress` of its own** (zero external exposure). Scale it up
-on-demand and point Telepresence/Mirrord at
-`deployment/<appName>-dev` to debug with the same environment as production
-— see [devspace.md](devspace.md).
+Mount volumes into the main app container. Volume source is determined by which
+discriminator field is set — supply exactly one per entry:
+
+| Discriminator | Volume source |
+|---|---|
+| `claimName` | `PersistentVolumeClaim` — reference existing, or create one (`create: true`) |
+| `configMapName` | `ConfigMap` — mounts the named ConfigMap |
+| `secretName` | `Secret` — mounts the named Secret |
+
+For ConfigMap and Secret volumes, `items[]` allows key-to-path projections: only
+the listed keys are mounted, at the given relative paths inside `mountPath`.
 
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `devSpace.enabled` | `boolean` | `false` | |
-| `devSpace.replicas` | `integer` | `0` | Scale to `1` on-demand to start the debug pod. |
-| `devSpace.image` | `string` | main `image` | Optional image override (`repository:tag`). e.g. `ghcr.io/org/app:debug`. Defaults to the main image. |
-| `devSpace.command` | `array<string>` | `["sleep", "infinity"]` | Keeps the pod alive for `kubectl exec`/port-forward without serving traffic itself. |
+| `volumes[].name` | `string` | required | Volume name (used in pod spec and `volumeMount`). |
+| `volumes[].mountPath` | `string` | required | Absolute mount path inside the container. |
+| `volumes[].subPath` | `string` | — | Optional subpath within the volume. |
+| `volumes[].readOnly` | `boolean` | `false` | |
+| `volumes[].claimName` | `string` | — | PVC name — reference existing, or name the PVC to create. Mutually exclusive with `configMapName`/`secretName`. |
+| `volumes[].create` | `boolean` | `false` | If true, compose a new `PersistentVolumeClaim` named `claimName`. |
+| `volumes[].storageClass` | `string` | — | StorageClass for the new PVC. Required when `create: true`. |
+| `volumes[].size` | `string` | — | PVC capacity (e.g. `"10Gi"`). Required when `create: true`. |
+| `volumes[].accessModes` | `array<string>` | `["ReadWriteOnce"]` | PVC access modes. Only used when `create: true`. |
+| `volumes[].configMapName` | `string` | — | Name of an existing ConfigMap to mount. Mutually exclusive with `claimName`/`secretName`. |
+| `volumes[].secretName` | `string` | — | Name of an existing Secret to mount. Mutually exclusive with `claimName`/`configMapName`. |
+| `volumes[].items[]` | `array` | — | Key-to-path projections for configMap/secret volumes. Each entry: `{key, path}`. |
+| `volumes[].items[].key` | `string` | required | Key in the ConfigMap or Secret. |
+| `volumes[].items[].path` | `string` | required | Relative path inside `mountPath` where this key is mounted. |
+
+### `darlane` (debug "twin" Deployment)
+
+If enabled, a second `<appName>-dev` Deployment is created alongside the
+main one — same `image`/`env`/`envFrom`/secrets, scaled to `0` by default
+and with **no `Service`/`Ingress` of its own** (zero external exposure).
+Scale it up on-demand, sync code with mutagen, or route real traffic via
+`trafficWeight` for A/B testing and feature flags. Use `mirrord` CLI directly
+against the darlane pod for local development with real cluster env and secrets.
+See [darlane.md](darlane.md) for the full developer guide.
+
+#### Core
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `darlane.enabled` | `boolean` | `false` | |
+| `darlane.replicas` | `integer` | `0` | Scale to `1` on-demand to start the debug pod. |
+| `darlane.image` | `string` | main `image` | Optional image override (`repository:tag`). |
+| `darlane.command` | `array<string>` | `["sleep", "infinity"]` | Container command. Keeps the pod alive for `kubectl exec`/port-forward. |
+| `darlane.args` | `array<string>` | — | Container args override (parallel to `darlane.command`). |
+| `darlane.containerPort` | `integer` | main `containerPort` | Port the darlane process listens on. Override when the dev server starts on a different port than the main app (e.g. hot-reload on `3000` vs. production on `8080`). Used as `targetPort` in the darlane Service when `trafficWeight > 0`. |
+| `darlane.env` | `array<{name,value}>` | `[]` | Extra env vars layered on top of main app env. darlane values win on key collision. |
+| `darlane.resources` | `object` | — | Resource requests/limits for the darlane pod, independent of the main app. Omit to inherit main app resources. |
+| `darlane.securityContext` | `object` | — | Security context overrides (`runAsUser`, `runAsGroup`, `readOnlyRootFilesystem`, etc). Applied on top of main app `securityContext`. `readOnlyRootFilesystem` defaults to `false` for darlane so `apt`/`pip` installs work without a custom image. |
+| `darlane.productionOverride` | `boolean` | `false` | Required when `environment: prod` to enable darlane. Double opt-in — visible in XR diffs and PRs. |
+| `darlane.ttl` | `string` | — | Adds `wxops.cloud/darlane-ttl` annotation to the dev Deployment (e.g. `"4h"`). Enforcement is a separate Kyverno policy. |
+| `darlane.trafficWeight` | `integer` | `0` | When `> 0` (and `ingress.enabled: true`), emits a `ClusterIP` Service for the darlane pod and a Traefik `TraefikService` weighted split. The Ingress backend switches to the `TraefikService` so real user traffic is split. `0` = debug only · `1–99` = A/B split · `100` = full canary. Requires Traefik with `TraefikService` CRD. |
+| `darlane.telemetryPort` | `integer` | — | When set, emits a `ClusterIP` Service named `{appName}-dev-telemetry` on this port. Provides stable in-cluster DNS for the OTEL collector, Prometheus, or any secondary port the darlane pod exposes. Common values: `4317` (OTEL gRPC), `4318` (OTEL HTTP), `9090` (Prometheus). Combine with `trafficWeight` for side-by-side A/B observability — one scrape target per version. |
+
+#### `darlane.volumes` — volumes
+
+Mount volumes into the darlane pod. Same discriminator pattern as main app `volumes[]`
+— set exactly one of `claimName`, `configMapName`, or `secretName`. Unlike main app
+volumes, PVC creation (`create: true`) is not supported here — reference existing
+claims only. Useful for persistent caches (pip/npm/go module downloads), shared datasets,
+config overlays, or Secret mounts that survive pod restarts.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `darlane.volumes[].name` | `string` | required | Volume name. |
+| `darlane.volumes[].mountPath` | `string` | required | Absolute mount path inside the container. |
+| `darlane.volumes[].subPath` | `string` | — | Optional subpath within the volume. |
+| `darlane.volumes[].readOnly` | `boolean` | `false` | |
+| `darlane.volumes[].claimName` | `string` | — | Name of an existing PVC in the target namespace. |
+| `darlane.volumes[].configMapName` | `string` | — | Name of an existing ConfigMap to mount. |
+| `darlane.volumes[].secretName` | `string` | — | Name of an existing Secret to mount. |
+| `darlane.volumes[].items[]` | `array` | — | Key-to-path projections for configMap/secret volumes. Each entry: `{key, path}`. |
+
+#### `darlane.serviceAccount` — pod identity for portal/CI access
+
+When `create: true`, the composition emits a dedicated `ServiceAccount` named
+`{appName}-darlane` (or the value of `name`). Use the SA token in the portal
+or CI pipeline to authenticate against the cluster — combine with workload
+identity annotations (IRSA, GCP WI) for credential-less access to cloud APIs.
+When `create: false` and `name` is set, the darlane pod runs as that existing SA.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `darlane.serviceAccount.create` | `boolean` | `false` | If true, emit a `ServiceAccount` named `{appName}-darlane` (or `name`) in the target namespace. |
+| `darlane.serviceAccount.name` | `string` | `{appName}-darlane` (when `create: true`) | SA name. When `create: false`, must reference an existing SA in the target namespace. |
+| `darlane.serviceAccount.annotations` | `object<string,string>` | `{}` | Annotations on the created SA (ignored when `create: false`). Use for workload identity bindings (`eks.amazonaws.com/role-arn`, `iam.gke.io/gcp-service-account`). |
 
 ### `service`
 
@@ -159,31 +235,70 @@ can opt in explicitly.
 
 ### `ingress`
 
+`ingress.enabled: true` always emits a Traefik `IngressRoute` (`traefik.io/v1alpha1`) —
+never a standard Kubernetes `Ingress`. This allows `darlane.trafficWeight` to switch
+between a plain `Service` backend and a `TraefikService` weighted split as a live
+in-place field update, with zero downtime.
+
+> **Migration note:** existing clusters that have a `networking.k8s.io/v1 Ingress`
+> managed by the old composition will experience a one-time gap when upgrading — the old
+> `Ingress` is orphaned and the new `IngressRoute` is created. After that, all subsequent
+> `trafficWeight` changes are zero-downtime.
+
 | Field | Type | Default | Description |
 |---|---|---|---|
-| `ingress.enabled` | `boolean` | `false` | |
-| `ingress.className` | `string` | `"traefik"` | |
-| `ingress.host` | `string` | | **Required if `ingress.enabled`** (validated by the Composition, not the XRD schema). |
-| `ingress.path` | `string` | `"/"` | |
-| `ingress.pathType` | `string` | `"Prefix"` | One of `Prefix`, `Exact`, `ImplementationSpecific`. |
-| `ingress.annotations` | `object<string, string>` | `{}` | |
-| `ingress.tls.enabled` | `boolean` | `false` | |
-| `ingress.tls.secretName` | `string` | `"{appName}-tls"` | |
-| `ingress.tls.clusterIssuer` | `string` | | Optional. If set (and `tls.enabled`), adds the `cert-manager.io/cluster-issuer` annotation so cert-manager automatically requests a certificate into `tls.secretName`. Requires [cert-manager](https://cert-manager.io/) and the named `ClusterIssuer` to exist in-cluster. If unset, `tls.secretName` must be provisioned by some other means (e.g. a pre-existing wildcard cert Secret). |
-| `ingress.auth.enabled` | `boolean` | `false` | If true, adds the `traefik.ingress.kubernetes.io/router.middlewares` annotation referencing `kube-system-auth-errors@kubernetescrd` and `kube-system-forward-auth-redirect@kubernetescrd` — SSO via oauth2-proxy's ForwardAuth, with a redirect to the login page on `401`. See [SSO via oauth2-proxy](#sso-via-oauth2-proxy) below. |
+| `ingress.enabled` | `boolean` | `false` | Emits a Traefik `IngressRoute`. |
+| `ingress.className` | `string` | `"traefik"` | Not used by `IngressRoute` — kept for schema compatibility. |
+| `ingress.host` | `string` | | **Required if `ingress.enabled`** (validated by the Composition, not the XRD schema). Rendered as `Host(\`{host}\`)` in the route match expression. |
+| `ingress.path` | `string` | `"/"` | Rendered as `PathPrefix(\`{path}\`)` in the route match expression. |
+| `ingress.pathType` | `string` | `"Prefix"` | Not used by `IngressRoute` — kept for schema compatibility. |
+| `ingress.annotations` | `object<string, string>` | `{}` | Merged onto the `IngressRoute` metadata annotations. |
+| `ingress.tls.enabled` | `boolean` | `false` | Sets `entryPoints: [websecure]` and `spec.tls.secretName` on the `IngressRoute`. |
+| `ingress.tls.secretName` | `string` | `"{appName}-tls"` | Name of the TLS Secret. When `clusterIssuer` is set, cert-manager writes into this name. Otherwise the Secret must already exist. |
+| `ingress.tls.clusterIssuer` | `string` | | If set (and `tls.enabled`), the composition emits a cert-manager `Certificate` CR referencing this `ClusterIssuer`. cert-manager auto-provisions the TLS Secret into `tls.secretName`; the `IngressRoute` references the same name. Requires [cert-manager](https://cert-manager.io/) and the named `ClusterIssuer` in-cluster. Without this field, `tls.secretName` must already exist (e.g. a pre-existing wildcard Secret). |
+| `ingress.auth.enabled` | `boolean` | `false` | If true, adds `auth-errors` and `forward-auth-redirect` Traefik `Middleware` references to `spec.routes[].middlewares` on the `IngressRoute` — SSO via oauth2-proxy's ForwardAuth, redirecting unauthenticated users (`401`) to the login page. See [SSO via oauth2-proxy](#sso-via-oauth2-proxy) below. |
+
+#### TLS auto-provisioning (cert-manager)
+
+When `ingress.tls.clusterIssuer` is set, the composition emits a `cert-manager.io/v1
+Certificate` CR alongside the `IngressRoute`:
+
+```yaml
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata:
+  name: "{appName}-tls"        # same as tls.secretName
+  namespace: "{namespace}"
+spec:
+  secretName: "{appName}-tls"
+  issuerRef:
+    name: letsencrypt-prod      # value of tls.clusterIssuer
+    kind: ClusterIssuer
+  dnsNames:
+    - payment-api.example.com   # value of ingress.host
+```
+
+cert-manager requests the certificate via the named `ClusterIssuer` and writes the
+resulting TLS key + chain into `tls.secretName`. The `IngressRoute`'s `spec.tls.secretName`
+references the same Secret — no manual certificate management required.
+
+**Prerequisites:** cert-manager installed in-cluster (`kubectl get crd certificates.cert-manager.io`),
+and the named `ClusterIssuer` exists and is ready (`kubectl get clusterissuer letsencrypt-prod`).
+
+**RBAC:** provider-kubernetes requires `cert-manager.io/certificates` in its ClusterRole —
+this is included in `providers/rbac-provider-kubernetes.yaml`.
 
 #### SSO via oauth2-proxy
 
 When `ingress.auth.enabled: true`, Traefik runs the `auth-errors` and
-`forward-auth-redirect` middlewares before routing to this app — together
-they call oauth2-proxy's ForwardAuth endpoint and redirect unauthenticated
-users (`401`) to the login page.
+`forward-auth-redirect` middlewares before routing to this app — they call
+oauth2-proxy's ForwardAuth endpoint and redirect unauthenticated users (`401`) to
+the login page. References are added to `spec.routes[].middlewares` on the
+`IngressRoute` (not via annotation, as `IngressRoute` uses native Middleware CRD
+references).
 
 Both `Middleware` CRDs are expected to exist in the `kube-system` namespace.
-`tenant-app` references them cross-namespace using the
-`kube-system-<name>@kubernetescrd` convention (e.g.
-`kube-system-auth-errors@kubernetescrd`). This requires Traefik to be
-configured with `--providers.kubernetescrd.allowCrossNamespace=true`.
+Requires Traefik configured with `--providers.kubernetescrd.allowCrossNamespace=true`.
 `tenant-app` does not provision or manage these `Middleware` CRDs.
 
 ## Vault secrets & databases
@@ -257,6 +372,6 @@ See [`examples/tenant-app/xr.yaml`](../examples/tenant-app/xr.yaml).
 
 ## See also
 
-- [DevSpace — In-Cluster Developer Environment](devspace.md) —
+- [Darlane — In-Cluster Developer Environment](darlane.md) —
   exec, file sync, traffic mirroring, A/B testing, AI agent workflow,
-  and SRE Agent with the devSpace debug twin.
+  and SRE Agent with the darlane debug twin.

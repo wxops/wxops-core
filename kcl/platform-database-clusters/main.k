@@ -115,6 +115,7 @@ Connection-string bundles:
   role + TLS cert automatically; no additional provider-sql wiring is needed
   for pooler auth itself
   (https://cloudnative-pg.io/docs/1.29/connection_pooling#default-authentication-method).
+
 """
 
 oxr = option("params").oxr
@@ -329,6 +330,18 @@ _cnpgSpec = {
     "managed": {"roles": _managedRoleEntries}
 } if managedRoles else {})
 
+# ── Observed state (keyed by Object name, Crossplane v2 / function-kcl v0.12.x) ──
+# Used for krm.kcl.dev/ready annotations on desired resources so function-kcl emits
+# READY_TRUE — fixing the native type:Ready condition. String "True" is required;
+# function-kcl v0.12.1 tightened type checks (boolean True no longer accepted).
+_ocds = option("params").ocds or {}
+_isReady = lambda name: str -> bool {
+    _ocd = _ocds[name] if name in _ocds else {}
+    _res = _get(_ocd, "Resource", {})
+    _conds = _get(_get(_res, "status", {}), "conditions", [])
+    len([c for c in _conds if _get(c, "type", "") == "Ready" and _get(c, "status", "") == "True"]) > 0
+}
+
 # ── Section 8: CNPG Cluster ───────────────────────────────────────────────────
 _cnpg_cluster = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
@@ -337,7 +350,7 @@ _cnpg_cluster = {
         name = short + "-cnpg-cluster"
         annotations = {
             "crossplane.io/composition-resource-name" = "cnpg-cluster"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-cluster") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -360,7 +373,7 @@ _cnpg_rw_pooler = {
         name = short + "-cnpg-rw-pooler"
         annotations = {
             "crossplane.io/composition-resource-name" = "cnpg-rw-pooler"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-rw-pooler") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -390,7 +403,7 @@ _cnpg_ro_pooler = {
         name = short + "-cnpg-ro-pooler"
         annotations = {
             "crossplane.io/composition-resource-name" = "cnpg-ro-pooler"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-ro-pooler") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -420,7 +433,7 @@ _scheduled_backup = {
         name = short + "-scheduled-backup"
         annotations = {
             "crossplane.io/composition-resource-name" = "cnpg-scheduled-backup"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-scheduled-backup") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -466,7 +479,7 @@ _push_secret = {
         name = short + "-push-secret"
         annotations = {
             "crossplane.io/composition-resource-name" = "superuser-push-secret"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-push-secret") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -500,7 +513,7 @@ _app_push_secret = {
         name = short + "-app-push-secret"
         annotations = {
             "crossplane.io/composition-resource-name" = "app-push-secret"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-app-push-secret") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -550,7 +563,7 @@ _sql_creds_secret = {
         name = short + "-sql-creds"
         annotations = {
             "crossplane.io/composition-resource-name" = "sql-creds"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-creds") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -589,7 +602,7 @@ _sql_provider_config = {
         name = short + "-sql-provider-config"
         annotations = {
             "crossplane.io/composition-resource-name" = "sql-provider-config"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-provider-config") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -625,7 +638,7 @@ _managed_role_gens = [{
         name = short + "-" + r.name + "-gen"
         annotations = {
             "crossplane.io/composition-resource-name" = r.name + "-pwd-gen"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-gen") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -654,7 +667,7 @@ _managed_role_conn_bundles = [{
         name = short + "-" + r.name + "-creds-bundle"
         annotations = {
             "crossplane.io/composition-resource-name" = r.name + "-creds-bundle"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-creds-bundle") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -701,7 +714,7 @@ _managed_role_push_secrets = [{
         name = short + "-" + r.name + "-push-secret"
         annotations = {
             "crossplane.io/composition-resource-name" = r.name + "-push-secret"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-push-secret") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}

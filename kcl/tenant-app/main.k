@@ -29,7 +29,7 @@ Inputs (via option("params").oxr.spec.parameters):
                        resources — purely metadata for catalog linking.
 
   labels             object  Default: {}. Extra labels merged onto all
-                       composed resources (Deployment/devSpace/Service/
+                       composed resources (Deployment/Darlane/Service/
                        Ingress). The standard app.kubernetes.io/* and
                        wxops.cloud/* labels always take precedence — they
                        cannot be overridden (selectors depend on them).
@@ -55,7 +55,7 @@ Inputs (via option("params").oxr.spec.parameters):
   imagePullSecrets   [string] Names of existing Secrets (type
                       kubernetes.io/dockerconfigjson) for pulling from
                       private registries. Added to pod spec on both the
-                      main Deployment and devSpace. Default: [].
+                      main Deployment and Darlane. Default: [].
 
   image              string  Container image (repository:tag). e.g. ghcr.io/org/app:1.0.0.
   imagePullPolicy    string  Default: "IfNotPresent".
@@ -144,28 +144,62 @@ Inputs (via option("params").oxr.spec.parameters):
                       both Middleware CRDs to exist in kube-system.
   ingress.annotations     object  Default: {}.
 
-  devSpace.enabled    bool    Default: false. If true, emits a second
-                      "<appName>-dev" Deployment sharing the main
+  darlane.enabled    bool    Default: false. If true, emits a second
+                      "<appName>-darlane" Deployment sharing the main
                       Deployment's image/env/envFrom, with no Service/
                       Ingress of its own (zero external exposure). Intended
                       as a target for Telepresence/Mirrord.
-  devSpace.replicas   int     Default: 0. Scale to 1 on-demand to debug.
-  devSpace.image      string  Optional image override (repository:tag). Defaults to
+  darlane.replicas   int     Default: 0. Scale to 1 on-demand to debug.
+  darlane.image      string  Optional image override (repository:tag). Defaults to
                       the main image.
-  devSpace.command    [string] Default: ["sleep", "infinity"] — keeps the
+  darlane.command    [string] Default: ["sleep", "infinity"] — keeps the
                       pod alive for exec/port-forward without serving traffic.
+  darlane.serviceAccount.create     bool   Default: false. If true, emit a
+                      ServiceAccount named {appName}-darlane (or .name). Use
+                      the SA token in the portal or CI to authenticate against
+                      the cluster (e.g. with workload identity bindings via
+                      serviceAccount.annotations).
+  darlane.serviceAccount.name       string Default: {appName}-darlane (when
+                      create: true). When create: false, references an existing
+                      SA in the target namespace; the Darlane pod runs as that SA.
+  darlane.serviceAccount.annotations object Default: {}. Annotations on the
+                      created SA (ignored when create: false).
+  darlane.telemetryPort  int   Optional. When set, emits a ClusterIP Service named
+                      {appName}-darlane-telemetry on this port. Provides stable in-cluster
+                      DNS for OTEL collector scraping, Prometheus metrics, or any
+                      secondary port the Darlane pod exposes (e.g. 4318 for OTEL HTTP,
+                      9090 for Prometheus). Works standalone or alongside trafficWeight
+                      for side-by-side A/B observability.
+  darlane.volumes    [{name, mountPath, claimName, subPath?, readOnly?}]
+                      Existing PVCs to mount into the Darlane pod. No PVC creation
+                      — reference existing claims only. Useful for persistent caches
+                      and shared data volumes across pod restarts.
+
+  volumes             [{name, mountPath, claimName, subPath?, readOnly?,
+                        create?, storageClass?, size?, accessModes?}]
+                      Volumes to mount into the main app container. Each entry
+                      references an existing PVC (claimName only) or creates a new
+                      one (set create: true with storageClass + size). Composed PVCs
+                      are named after claimName.
 
 Composed resources:
-  app-deployment      apps/v1                       Deployment      — app workload.
-  app-dev-deployment  apps/v1                       Deployment      — debug twin (if devSpace.enabled).
-  app-service-account v1                            ServiceAccount  — (if serviceAccount.create).
-  app-service         v1                            Service         — (if service.enabled, default true).
-  app-ingress         networking.k8s.io/v1          Ingress         — (if ingress.enabled).
+  app-deployment            apps/v1                       Deployment      — app workload.
+  app-pvc-{name}            v1                            PersistentVolumeClaim — (per volumes[].create: true).
+  app-darlane-deployment    apps/v1                       Deployment      — Darlane lane (if darlane.enabled).
+  app-darlane-sa            v1                            ServiceAccount  — (if darlane.serviceAccount.create).
+  app-darlane-telemetry-svc v1                            Service         — (if darlane.telemetryPort set).
+  app-service-account       v1                            ServiceAccount  — (if serviceAccount.create).
+  app-service               v1                            Service         — (if service.enabled, default true).
+  app-certificate           cert-manager.io/v1            Certificate     — (if ingress.tls.clusterIssuer set).
+  app-ingress               traefik.io/v1alpha1           IngressRoute    — (if ingress.enabled).
+  app-darlane-svc           v1                            Service         — (if darlane.trafficWeight > 0).
+  app-weighted-traefikservice traefik.io/v1alpha1         TraefikService  — (if darlane.trafficWeight > 0).
 
 This XR deliberately stops at the application workload: Vault-backed secrets
 (ExternalSecret/PushSecret) and databases (XTenantDatabase) are platform-level
 concerns wired up separately — apps consume the resulting Secrets via
 `envFrom`.
+
 """
 
 oxr = option("params").oxr
@@ -210,14 +244,17 @@ _containerSecurityContext = {} \
     | ({"allowPrivilegeEscalation" = _sc.allowPrivilegeEscalation} if "allowPrivilegeEscalation" in _sc else {}) \
     | ({"capabilities" = _capsObj} if len(_capsObj) > 0 else {})
 
-# Extra user-supplied labels are merged in first so the standard
-# app.kubernetes.io/* and wxops.cloud/* labels below always win — selectors
-# (Deployment.spec.selector, Service.spec.selector) depend on these being
-# stable and not overridable.
+# _selectorLabels: minimal stable set used ONLY for Deployment.spec.selector and
+# Service.spec.selector. spec.selector is immutable on Deployments — never add
+# new labels here after first deploy. All metadata-only labels (managed-by,
+# app-flavor, environment) belong in pod template labels only.
 _userLabels = _get(params, "labels", {})
-labels = _userLabels | {
+_selectorLabels = {
     "app.kubernetes.io/name" = appName
     "app.kubernetes.io/instance" = appName
+    "app.kubernetes.io/component" = "app"
+}
+labels = _userLabels | _selectorLabels | {
     "app.kubernetes.io/managed-by" = "crossplane"
     "wxops.cloud/app-flavor" = appFlavor
     "wxops.cloud/environment" = environment
@@ -232,6 +269,19 @@ _repo = _get(params, "repository", {})
 _repoUrl = _get(_repo, "url", "")
 
 _commonAnnotations = ({"wxops.cloud/template-id" = _templateId} if _templateId != "" else {}) | ({"wxops.cloud/repo-url" = _repoUrl} if _repoUrl != "" else {})
+
+# ── Observed state (keyed by Object name, Crossplane v2 / function-kcl v0.12.x) ──
+# Used for: (1) status write-back, and (2) krm.kcl.dev/ready annotations on desired
+# resources so function-kcl emits READY_TRUE instead of READY_UNSPECIFIED — fixing
+# the native type:Ready condition. String "True" is required; v0.12.1 tightened type
+# checks (boolean True no longer accepted by the KRM engine).
+_ocds = option("params").ocds or {}
+_isReady = lambda name: str -> bool {
+    _ocd = _ocds[name] if name in _ocds else {}
+    _res = _get(_ocd, "Resource", {})
+    _conds = _get(_get(_res, "status", {}), "conditions", [])
+    len([c for c in _conds if _get(c, "type", "") == "Ready" and _get(c, "status", "") == "True"]) > 0
+}
 
 # ── Container / Deployment ─────────────────────────────────────────
 _imgStr = params.image
@@ -323,6 +373,37 @@ _startupProbe = {
     failureThreshold = _get(_startup, "failureThreshold", 30)
 }
 
+# ── Volumes (main app) ───────────────────────────────────────────────
+# Volume source is discriminated by which field is set:
+#   claimName     → persistentVolumeClaim  (PVC creation supported via create: true)
+#   configMapName → configMap
+#   secretName    → secret
+# items[] on configMap/secret entries specifies key-to-path projections.
+# KCL list comp bodies must be a single expression — helpers wrap the merge chain.
+_makeVolumeMount = lambda v: any -> any {
+    _base = {"name" = v.name, "mountPath" = v.mountPath}
+    _sub = _base | ({"subPath" = _get(v, "subPath", "")} if _get(v, "subPath", "") != "" else {})
+    _sub | ({"readOnly" = True} if _get(v, "readOnly", False) else {})
+}
+_makePvcSpec = lambda v: any -> any {
+    _sc = _get(v, "storageClass", "")
+    _base = {accessModes = _get(v, "accessModes", ["ReadWriteOnce"]), resources = {requests = {storage = v.size}}}
+    _base | ({"storageClassName" = _sc} if _sc != "" else {})
+}
+_makeVolume = lambda v: any -> any {
+    _claimName = _get(v, "claimName", "")
+    _cmName = _get(v, "configMapName", "")
+    _sName = _get(v, "secretName", "")
+    _proj = _get(v, "items", [])
+    _projBlock = {"items" = _proj} if len(_proj) > 0 else {}
+    {"name" = v.name, "persistentVolumeClaim" = {"claimName" = _claimName}} if _claimName != "" else \
+    ({"name" = v.name, "configMap" = {"name" = _cmName} | _projBlock} if _cmName != "" else \
+    {"name" = v.name, "secret" = {"secretName" = _sName} | _projBlock})
+}
+_volumes = _get(params, "volumes", [])
+_podVolumes = [_makeVolume(v) for v in _volumes]
+_podVolumeMounts = [_makeVolumeMount(v) for v in _volumes]
+
 _base_container = {
     name = appName
     image = _imgStr
@@ -338,7 +419,8 @@ _container_args = _container_cmd | ({"args" = params.args} if "args" in params e
 _container_sec = _container_args | ({"securityContext" = _containerSecurityContext} if len(_containerSecurityContext) > 0 else {})
 _container_liveness = _container_sec | ({"livenessProbe" = _livenessProbe} if livenessEnabled else {})
 _container_readiness = _container_liveness | ({"readinessProbe" = _readinessProbe} if readinessEnabled else {})
-_container = _container_readiness | ({"startupProbe" = _startupProbe} if startupEnabled else {})
+_container_startup = _container_readiness | ({"startupProbe" = _startupProbe} if startupEnabled else {})
+_container = _container_startup | ({"volumeMounts" = _podVolumeMounts} if len(_podVolumeMounts) > 0 else {})
 
 _deployment = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
@@ -347,7 +429,7 @@ _deployment = {
         name = appName + "-deployment"
         annotations = {
             "crossplane.io/composition-resource-name" = "app-deployment"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-deployment") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -364,10 +446,11 @@ _deployment = {
                 spec = {
                     replicas = replicas
                     strategy = _strategy
-                    selector = {matchLabels = labels}
+                    selector = {matchLabels = _selectorLabels}
                     template = {
                         metadata = {labels = labels, annotations = _podAnnotations}
                         spec = {containers = [_container]} \
+                            | ({"volumes" = _podVolumes} if len(_podVolumes) > 0 else {}) \
                             | ({"imagePullSecrets" = [{"name" = s} for s in _imagePullSecrets]} if len(_imagePullSecrets) > 0 else {}) \
                             | ({"serviceAccountName" = _saName} if _saName != "" else {}) \
                             | ({"securityContext" = _podSecurityContext} if len(_podSecurityContext) > 0 else {}) \
@@ -379,37 +462,92 @@ _deployment = {
     }
 }
 
-# ── DevSpace (optional debug "twin" Deployment) ──────────────────────
+# ── Darlane (in-cluster developer lane) ─────────────────────────────
 # Scaled to 0 by default — shares image/env/envFrom with the main Deployment,
 # but has no Service/Ingress of its own (zero external exposure). Scale it up
-# on-demand and point Telepresence/Mirrord at deployment/<appName>-dev to
-# mirror traffic and debug with the same environment as production.
-_devSpace = params.devSpace if "devSpace" in params else {}
-devSpaceEnabled = _get(_devSpace, "enabled", False)
-devSpaceReplicas = _get(_devSpace, "replicas", 0)
-_devCommand = _get(_devSpace, "command", ["sleep", "infinity"])
+# on-demand, use mirrord to mirror production traffic, or sync code via SSH sidecar.
+_darlane = params.darlane if "darlane" in params else {}
+_darlaneProdOverride = _get(_darlane, "productionOverride", False)
+_darlaneRequested = _get(_darlane, "enabled", False)
+darlaneEnabled = _darlaneRequested if environment != "prod" else (_darlaneRequested and _darlaneProdOverride)
+darlaneReplicas = _get(_darlane, "replicas", 0)
+_darlaneCommand = _get(_darlane, "command", ["sleep", "infinity"])
+_darlaneEnvExtra = _get(_darlane, "env", [])
+_darlaneArgs = _get(_darlane, "args", [])
+_darlaneResources = _get(_darlane, "resources", {})
+_darlaneSecCtxOvr = _get(_darlane, "securityContext", {})
+_darlaneTtl = _get(_darlane, "ttl", "")
+_darlaneTrafficWeight = _get(_darlane, "trafficWeight", 0)
+_darlaneSticky = _get(_darlane, "stickySession", {})
+_darlaneStickyEnabled = _get(_darlaneSticky, "enabled", False)
+_darlaneStickyCookieName = _get(_darlaneSticky, "cookieName", "darlane-ab")
+_darlaneStickySecure = _get(_darlaneSticky, "secure", True)
+_darlaneStickySameSite = _get(_darlaneSticky, "sameSite", "lax")
+_darlaneContainerPort = _get(_darlane, "containerPort", containerPort)
+_darlaneSa = _get(_darlane, "serviceAccount", {})
+_darlaneSaCreate = _get(_darlaneSa, "create", False)
+_darlaneSaName = _get(_darlaneSa, "name", appName + "-darlane") if _darlaneSaCreate else _get(_darlaneSa, "name", "")
+_darlaneSaAnnotations = _get(_darlaneSa, "annotations", {})
+_darlaneTelemetryPort = _get(_darlane, "telemetryPort", 0)
+_darlaneVolumes = _get(_darlane, "volumes", [])
+_darlanePodVolumes = [_makeVolume(v) for v in _darlaneVolumes]
+_darlanePodVolumeMounts = [_makeVolumeMount(v) for v in _darlaneVolumes]
 
-_devLabels = labels | {"app.kubernetes.io/component" = "devspace"}
-
-_dev_container = {
-    name = appName + "-dev"
-    image = _get(_devSpace, "image", _imgStr)
+# fileSync — writable emptyDir overlay for code sync tools (kubectl cp, mutagen, etc.)
+# When readOnlyRootFilesystem: true locks the image's filesystem, the emptyDir mounted
+# at the same path provides a writable layer on top. initContainer pre-populates it from
+# the image so the pod starts with the full source tree; sync tools then push only deltas.
+_darlaneFileSync = _get(_darlane, "fileSync", {})
+_darlaneFileSyncEnabled = _get(_darlaneFileSync, "enabled", False)
+_darlaneFileSyncPath = _get(_darlaneFileSync, "mountPath", "/app")
+_darlaneFileSyncInit = _get(_darlaneFileSync, "initFromImage", True)
+_darlaneSyncVolume = {"name" = "darlane-sync", "emptyDir" = {}}
+_darlaneSyncMount = {"name" = "darlane-sync", "mountPath" = _darlaneFileSyncPath}
+_darlaneSyncInitContainer = {
+    name = "darlane-init-sync"
+    image = _get(_darlane, "image", _imgStr)
     imagePullPolicy = _pullPolicy
-    ports = [{containerPort = containerPort}]
-    env = _env
-    command = _devCommand
-} | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {}) \
-  | ({"resources" = params.resources} if "resources" in params else {}) \
-  | ({"securityContext" = _containerSecurityContext} if len(_containerSecurityContext) > 0 else {})
+    command = ["sh", "-c", "cp -rp {}/. /darlane-sync/".format(_darlaneFileSyncPath)]
+    volumeMounts = [{"name" = "darlane-sync", "mountPath" = "/darlane-sync"}]
+}
+_allDarlaneVolumes = _darlanePodVolumes + ([_darlaneSyncVolume] if _darlaneFileSyncEnabled else [])
+_allDarlaneVolumeMounts = _darlanePodVolumeMounts + ([_darlaneSyncMount] if _darlaneFileSyncEnabled else [])
 
-_dev_deployment = {
+# env merge: Darlane extra env wins on key collision with main app env
+_darlaneEnvKeys = [e.name for e in _darlaneEnvExtra]
+_darlaneBaseEnv = [e for e in _env if e.name not in _darlaneEnvKeys]
+_darlaneFinalEnv = _darlaneBaseEnv + _darlaneEnvExtra
+
+# securityContext merge: Darlane overrides applied on top of main container secCtx
+_darlaneContainerSecCtx = _containerSecurityContext | _darlaneSecCtxOvr
+
+_darlaneDeploymentAnnotations = _commonAnnotations \
+    | ({"wxops.cloud/darlane-ttl" = _darlaneTtl} if _darlaneTtl != "" else {})
+
+_darlaneSelectorLabels = _selectorLabels | {"app.kubernetes.io/component" = "darlane"}
+_darlaneLabels = labels | {"app.kubernetes.io/component" = "darlane"}
+
+_darlane_container = {
+    name = appName + "-darlane"
+    image = _get(_darlane, "image", _imgStr)
+    imagePullPolicy = _pullPolicy
+    ports = [{containerPort = _darlaneContainerPort}]
+    env = _darlaneFinalEnv
+    command = _darlaneCommand
+} | ({"envFrom" = _envFrom} if len(_envFrom) > 0 else {}) \
+  | ({"resources" = _darlaneResources} if len(_darlaneResources) > 0 else ({"resources" = params.resources} if "resources" in params else {})) \
+  | ({"securityContext" = _darlaneContainerSecCtx} if len(_darlaneContainerSecCtx) > 0 else {}) \
+  | ({"args" = _darlaneArgs} if len(_darlaneArgs) > 0 else {}) \
+  | ({"volumeMounts" = _allDarlaneVolumeMounts} if len(_allDarlaneVolumeMounts) > 0 else {})
+
+_darlane_deployment = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
     kind = "Object"
     metadata = {
-        name = appName + "-dev-deployment"
+        name = appName + "-darlane-deployment"
         annotations = {
-            "crossplane.io/composition-resource-name" = "app-dev-deployment"
-        }
+            "crossplane.io/composition-resource-name" = "app-darlane-deployment"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-deployment") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -418,22 +556,79 @@ _dev_deployment = {
                 apiVersion = "apps/v1"
                 kind = "Deployment"
                 metadata = {
-                    name = appName + "-dev"
+                    name = appName + "-darlane"
                     namespace = ns
-                    labels = _devLabels
-                    annotations = _commonAnnotations
+                    labels = _darlaneLabels
+                    annotations = _darlaneDeploymentAnnotations
                 }
                 spec = {
-                    replicas = devSpaceReplicas
-                    selector = {matchLabels = _devLabels}
+                    replicas = darlaneReplicas
+                    selector = {matchLabels = _darlaneSelectorLabels}
                     template = {
-                        metadata = {labels = _devLabels}
-                        spec = {containers = [_dev_container]} \
+                        metadata = {labels = _darlaneLabels}
+                        spec = {containers = [_darlane_container]} \
+                            | ({"initContainers" = [_darlaneSyncInitContainer]} if _darlaneFileSyncEnabled and _darlaneFileSyncInit else {}) \
+                            | ({"volumes" = _allDarlaneVolumes} if len(_allDarlaneVolumes) > 0 else {}) \
                             | ({"imagePullSecrets" = [{"name" = s} for s in _imagePullSecrets]} if len(_imagePullSecrets) > 0 else {}) \
-                            | ({"serviceAccountName" = _saName} if _saName != "" else {}) \
+                            | ({"serviceAccountName" = _darlaneSaName} if _darlaneSaName != "" else ({"serviceAccountName" = _saName} if _saName != "" else {})) \
                             | ({"securityContext" = _podSecurityContext} if len(_podSecurityContext) > 0 else {}) \
                             | ({"terminationGracePeriodSeconds" = _terminationGracePeriod} if _terminationGracePeriod != 30 else {})
                     }
+                }
+            }
+        }
+    }
+}
+
+_darlane_sa = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-darlane-sa"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-darlane-sa"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-sa") else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "v1"
+                kind = "ServiceAccount"
+                metadata = {
+                    name = _darlaneSaName
+                    namespace = ns
+                    labels = _darlaneLabels
+                    annotations = _commonAnnotations | _darlaneSaAnnotations
+                }
+            }
+        }
+    }
+}
+
+# ── Darlane telemetry Service ────────────────────────────────────────
+# Stable in-cluster DNS for OTEL collector, Prometheus, or any secondary port.
+# Selector targets Darlane pod only (_darlaneLabels has component=darlane).
+_darlane_telemetry_service = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-darlane-telemetry-svc"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-darlane-telemetry-svc"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-telemetry-svc") else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "v1"
+                kind = "Service"
+                metadata = {name = appName + "-darlane-telemetry", namespace = ns, labels = _darlaneLabels, annotations = _commonAnnotations}
+                spec = {
+                    type = "ClusterIP"
+                    selector = _darlaneSelectorLabels
+                    ports = [{port = _darlaneTelemetryPort, targetPort = _darlaneTelemetryPort, name = "telemetry"}]
                 }
             }
         }
@@ -450,7 +645,7 @@ _service = {
         name = appName + "-service"
         annotations = {
             "crossplane.io/composition-resource-name" = "app-service"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-service") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -461,8 +656,76 @@ _service = {
                 metadata = {name = appName, namespace = ns, labels = labels, annotations = _commonAnnotations}
                 spec = {
                     type = _get(_svc, "type", "ClusterIP")
-                    selector = labels
+                    selector = _selectorLabels
                     ports = [{port = servicePort, targetPort = containerPort}]
+                }
+            }
+        }
+    }
+}
+
+# ── Darlane traffic routing (Service + TraefikService weighted split) ──
+# Emitted only when darlaneEnabled and trafficWeight > 0 and ingressEnabled.
+# The Darlane Service gives the TraefikService a concrete backend for the lane pod.
+# The TraefikService splits traffic between main app and Darlane by weight.
+_darlane_service = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-darlane-svc"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-darlane-svc"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-svc") else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "v1"
+                kind = "Service"
+                metadata = {name = appName + "-darlane", namespace = ns, labels = _darlaneLabels, annotations = _commonAnnotations}
+                spec = {
+                    type = "ClusterIP"
+                    selector = _darlaneSelectorLabels
+                    ports = [{port = servicePort, targetPort = _darlaneContainerPort}]
+                }
+            }
+        }
+    }
+}
+
+_darlane_sticky_block = {
+    cookie = {
+        name = _darlaneStickyCookieName
+        secure = _darlaneStickySecure
+        httpOnly = True
+        sameSite = _darlaneStickySameSite
+    }
+}
+
+_darlane_traefik_service = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-weighted-traefikservice"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-weighted-traefikservice"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-weighted-traefikservice") else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "traefik.io/v1alpha1"
+                kind = "TraefikService"
+                metadata = {name = appName + "-weighted", namespace = ns, labels = labels, annotations = _commonAnnotations}
+                spec = {
+                    weighted = {
+                        services = [
+                            {name = appName, port = servicePort, weight = 100 - _darlaneTrafficWeight}
+                            {name = appName + "-darlane", port = servicePort, weight = _darlaneTrafficWeight}
+                        ]
+                    } | ({"sticky" = _darlane_sticky_block} if _darlaneStickyEnabled else {})
                 }
             }
         }
@@ -475,73 +738,112 @@ _service = {
 _ing = params.ingress if "ingress" in params else {}
 ingressEnabled = _get(_ing, "enabled", False)
 _ingTls = _ing.tls if "tls" in _ing else {}
+_clusterIssuer = _get(_ingTls, "clusterIssuer", "")
+_certSecretName = _get(_ingTls, "secretName", appName + "-tls")
+_certificateEnabled = ingressEnabled and _get(_ingTls, "enabled", False) and _clusterIssuer != ""
+
+# trafficWeight: active only when Darlane is enabled, weight > 0, and ingress exists.
+# When active, the standard Kubernetes Ingress is replaced with a Traefik IngressRoute —
+# Kubernetes Ingress only supports Service backends; IngressRoute natively understands
+# TraefikService backends for weighted routing. When weight returns to 0, switches back.
+_darlaneTrafficEnabled = darlaneEnabled and _darlaneTrafficWeight > 0 and ingressEnabled
 
 # host is required when ingress is enabled — an empty host on an Ingress
 # rule is a catch-all (matches any incoming Host header), which is never
 # what's intended here.
 assert not (ingressEnabled and _get(_ing, "host", "") == ""), "ingress.host is required when ingress.enabled is true"
 
-_ingress_spec_base = {
-    ingressClassName = _get(_ing, "className", "traefik")
-    rules = [{
-        host = _get(_ing, "host", "")
-        http = {
-            paths = [{
-                path = _get(_ing, "path", "/")
-                pathType = _get(_ing, "pathType", "Prefix")
-                backend = {
-                    service = {
-                        name = appName
-                        port = {number = servicePort}
-                    }
+_ingAuth = _ing.auth if "auth" in _ing else {}
+
+# Always emit Traefik IngressRoute — never standard Kubernetes Ingress.
+# IngressRoute supports both plain Service and TraefikService backends in the same
+# resource type, so switching trafficWeight is a live field update on the existing
+# Object. Traefik picks it up immediately — no resource deletion, no gap, zero downtime.
+#
+#   trafficWeight = 0  → services: [{name: appName, port: servicePort}]           (direct)
+#   trafficWeight > 0  → services: [{name: appName-weighted, kind: TraefikService}] (split)
+#
+# Auth: Middleware references in spec.routes[].middlewares (native IngressRoute, not annotations).
+# TLS:  When tls.clusterIssuer is set, the composition emits a cert-manager Certificate CR
+#       (app-certificate) that auto-provisions the Secret into tls.secretName. The IngressRoute
+#       references that same secretName. Without clusterIssuer, secretName must already exist.
+
+_ingressroute_middlewares = ([
+    {"name" = "auth-errors", "namespace" = "kube-system"}
+    {"name" = "forward-auth-redirect", "namespace" = "kube-system"}
+] if _get(_ingAuth, "enabled", False) else [])
+
+_ingressroute_services = [
+    {"name" = appName + "-weighted", "kind" = "TraefikService"}
+] if _darlaneTrafficEnabled else [
+    {"name" = appName, "port" = servicePort}
+]
+
+_ingressroute_route = {
+    match = "Host(`{}`) && PathPrefix(`{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"))
+    kind = "Rule"
+    services = _ingressroute_services
+} | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
+
+_certificate = {
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-certificate"
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-certificate"
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-certificate") else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "cert-manager.io/v1"
+                kind = "Certificate"
+                metadata = {
+                    name = _certSecretName
+                    namespace = ns
+                    labels = labels
+                    annotations = _commonAnnotations
                 }
-            }]
+                spec = {
+                    secretName = _certSecretName
+                    issuerRef = {
+                        name = _clusterIssuer
+                        kind = "ClusterIssuer"
+                    }
+                    dnsNames = [_get(_ing, "host", "")]
+                }
+            }
         }
-    }]
+    }
 }
 
-_ingress_tls_merge = ({"tls" = [{hosts = [_get(_ing, "host", "")], secretName = _get(_ingTls, "secretName", appName + "-tls")}]} if _get(_ingTls, "enabled", False) else {})
-_ingress_spec = _ingress_spec_base | _ingress_tls_merge
-
-# cert-manager: when tls.enabled and tls.clusterIssuer is set, add the
-# cert-manager.io/cluster-issuer annotation so cert-manager automatically
-# requests a certificate into tls.secretName via an HTTP-01/DNS-01 Challenge.
-# If clusterIssuer is left unset, tls.secretName must be provisioned by some
-# other means (e.g. a pre-existing wildcard cert Secret) — tenant-app doesn't
-# assume a default issuer name since that's cluster-specific.
-_clusterIssuer = _get(_ingTls, "clusterIssuer", "")
-_certManagerAnnotations = ({"cert-manager.io/cluster-issuer" = _clusterIssuer} if _get(_ingTls, "enabled", False) and _clusterIssuer != "" else {})
-
-# SSO: when auth.enabled, attach the auth-errors and forward-auth-redirect
-# Traefik Middleware CRDs (oauth2-proxy ForwardAuth + redirect-to-login on
-# 401). Both CRDs live in kube-system and are referenced cross-namespace via
-# the <namespace>-<name>@kubernetescrd convention. Requires Traefik to be
-# started with --providers.kubernetescrd.allowCrossNamespace=true.
-_ingAuth = _ing.auth if "auth" in _ing else {}
-_authAnnotations = ({"traefik.ingress.kubernetes.io/router.middlewares" = "kube-system-auth-errors@kubernetescrd,kube-system-forward-auth-redirect@kubernetescrd"} if _get(_ingAuth, "enabled", False) else {})
-
-_ingress = {
+_ingress_object = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
     kind = "Object"
     metadata = {
         name = appName + "-ingress"
         annotations = {
             "crossplane.io/composition-resource-name" = "app-ingress"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-ingress") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
         forProvider = {
             manifest = {
-                apiVersion = "networking.k8s.io/v1"
-                kind = "Ingress"
+                apiVersion = "traefik.io/v1alpha1"
+                kind = "IngressRoute"
                 metadata = {
                     name = appName
                     namespace = ns
                     labels = labels
-                    annotations = _commonAnnotations | _certManagerAnnotations | _authAnnotations | _get(_ing, "annotations", {})
+                    annotations = _commonAnnotations | _get(_ing, "annotations", {})
                 }
-                spec = _ingress_spec
+                spec = {
+                    entryPoints = ["websecure"] if _get(_ingTls, "enabled", False) else ["web"]
+                    routes = [_ingressroute_route]
+                } | ({"tls" = {"secretName" = _get(_ingTls, "secretName", appName + "-tls")}} if _get(_ingTls, "enabled", False) else {})
             }
         }
     }
@@ -555,7 +857,7 @@ _serviceAccount = {
         name = appName + "-sa"
         annotations = {
             "crossplane.io/composition-resource-name" = "app-service-account"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-sa") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -574,5 +876,71 @@ _serviceAccount = {
     }
 }
 
+# ── PVC resources (volumes[].create: true) ──────────────────────────
+_pvc_items = [{
+    apiVersion = "kubernetes.crossplane.io/v1alpha2"
+    kind = "Object"
+    metadata = {
+        name = appName + "-pvc-" + v.name
+        annotations = {
+            "crossplane.io/composition-resource-name" = "app-pvc-" + v.name
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-pvc-" + v.name) else {})
+    }
+    spec = {
+        providerConfigRef = {name = "default"}
+        forProvider = {
+            manifest = {
+                apiVersion = "v1"
+                kind = "PersistentVolumeClaim"
+                metadata = {name = v.claimName, namespace = ns, labels = labels}
+                spec = _makePvcSpec(v)
+            }
+        }
+    }
+} for v in _volumes if _get(v, "create", False)]
+
+# ── Status write-back (dxr) ─────────────────────────────────────────
+# Emitting an item with the XR's own apiVersion/kind writes status fields back
+# to the XR, giving operators a quick signal from `kubectl get xtenantapp`.
+#
+# `ocds` (observed composed resources) holds the last-known state of each
+# Object from provider-kubernetes. Reading the Ready condition here means the
+# XR status.ready reflects real cluster state rather than Crossplane's own
+# potentially-lagging composite Ready condition.
+# created: Objects exist in ocds → the cluster resources were provisioned at least once.
+# ready:   Objects exist AND their Ready condition is True → pods are running.
+_deploymentCreated = (appName + "-deployment") in _ocds
+_serviceCreated = ((appName + "-service") in _ocds) if serviceEnabled else True
+_ingressCreated = ((appName + "-ingress") in _ocds) if ingressEnabled else True
+_appCreated = _deploymentCreated and _serviceCreated and _ingressCreated
+
+_deploymentReady = _isReady(appName + "-deployment")
+_serviceReady = _isReady(appName + "-service") if serviceEnabled else True
+_ingressReady = _isReady(appName + "-ingress") if ingressEnabled else True
+_appReady = _deploymentReady and _serviceReady and _ingressReady
+
+_appUrl = ("https://" if _get(_ingTls, "enabled", False) else "http://") + _get(_ing, "host", "") if ingressEnabled else ""
+_dxr = {
+    apiVersion = oxr.apiVersion
+    kind = oxr.kind
+    status = {
+        created = _appCreated
+        ready = _appReady
+        url = _appUrl
+        namespace = ns
+        image = params.image
+    }
+}
+
 # ── Final resource list ─────────────────────────────────────────────
-items = [_deployment] + ([_dev_deployment] if devSpaceEnabled else []) + ([_serviceAccount] if _saCreate else []) + ([_service] if serviceEnabled else []) + ([_ingress] if ingressEnabled else [])
+items = [_dxr, _deployment] \
+    + _pvc_items \
+    + ([_darlane_deployment] if darlaneEnabled else []) \
+    + ([_darlane_sa] if darlaneEnabled and _darlaneSaCreate else []) \
+    + ([_darlane_telemetry_service] if darlaneEnabled and _darlaneTelemetryPort > 0 else []) \
+    + ([_serviceAccount] if _saCreate else []) \
+    + ([_service] if serviceEnabled else []) \
+    + ([_darlane_service] if _darlaneTrafficEnabled else []) \
+    + ([_darlane_traefik_service] if _darlaneTrafficEnabled else []) \
+    + ([_certificate] if _certificateEnabled else []) \
+    + ([_ingress_object] if ingressEnabled else [])

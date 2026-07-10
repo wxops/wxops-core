@@ -39,6 +39,8 @@ spec:
     # ── Everything below is optional — shown enabled for reference ──────
     # replicas: 2
     # containerPort: 8080
+    # command: ["node", "server.js"]    # override image ENTRYPOINT — omit to use image default
+    # args: ["--port", "8080"]          # override image CMD — can be set independently of command
     # resources:
     #   requests:
     #     cpu: "100m"
@@ -82,11 +84,107 @@ spec:
     # reloader:
     #   enabled: true
 
-    # devSpace:
+    # volumes:
+    #   - name: data
+    #     mountPath: /data
+    #     claimName: payment-api-data   # use existing PVC
+    #   - name: cache
+    #     mountPath: /cache
+    #     claimName: payment-api-cache  # create a new PVC
+    #     create: true
+    #     storageClass: fast-ssd
+    #     size: 10Gi
+    #   - name: app-config
+    #     mountPath: /etc/app           # mounts all keys from the ConfigMap
+    #     configMapName: payment-api-config
+    #   - name: feature-flags
+    #     mountPath: /etc/flags
+    #     configMapName: feature-flags  # key-to-path projection — only listed keys mounted
+    #     items:
+    #       - key: flags.json
+    #         path: flags.json
+    #   - name: db-creds
+    #     mountPath: /run/secrets/db    # mounts all keys from the Secret
+    #     secretName: payment-api-db-creds
+    #     readOnly: true
+    #   - name: api-key
+    #     mountPath: /run/secrets       # projection — only one key from the Secret
+    #     secretName: payment-api-keys
+    #     items:
+    #       - key: STRIPE_KEY
+    #         path: stripe-key
+
+    # darlane:
     #   enabled: true
-    #   replicas: 0          # default — scale to 1 on-demand
+    #   replicas: 0                      # default — scale to 1 on-demand
     #   # image: ghcr.io/rocket-team/payment-api:debug
-    #   # command: ["sleep", "infinity"]  # default
+    #
+    #   # Tier 1: usable pod
+    #   command: ["uvicorn", "main:app", "--reload"]  # hot-reload for file sync
+    #   # containerPort: 8000          # if dev server starts on a different port than main app
+    #   #                              # required for A/B traffic to reach the right port
+    #   # args: ["--workers", "1"]
+    #   env:
+    #     - name: LOG_LEVEL
+    #       value: debug
+    #     - name: FEATURE_NEW_RANKING   # overrides main app env on collision
+    #       value: "true"
+    #   resources:
+    #     requests: {cpu: "100m", memory: "256Mi"}
+    #     limits: {memory: "1Gi"}
+    #   securityContext:
+    #     runAsNonRoot: true
+    #     # readOnlyRootFilesystem defaults to false for Darlane (allows apt/pip)
+    #
+    #   # File sync — writable emptyDir overlay, works even with readOnlyRootFilesystem: true
+    #   # fileSync:
+    #   #   enabled: true          # emits emptyDir volume at mountPath
+    #   #   mountPath: /app        # default — must match where app reads source files
+    #   #   initFromImage: true    # default — initContainer pre-populates from image; sync tools push deltas
+    #   #   # Developer side:
+    #   #   #   POD=$(kubectl -n <ns> get pods -l app.kubernetes.io/component=darlane -o jsonpath='{.items[0].metadata.name}')
+    #   #   #   mutagen sync create --name <appName>-darlane ./src k8s://<ns>/${POD}:/app
+    #   #   #   kubectl cp ./src/. <ns>/<pod>:/app   # one-shot alternative
+    #
+    #   # mirrord (CLI only — no manifest config needed):
+    #   #   mirrord exec --target deployment/<appName>-darlane -- <command>
+    #   #   mirrord exec --target deployment/<appName>-darlane --steal -- <command>
+    #   #   mirrord exec --target deployment/<appName>-darlane --steal --filter "x-debug-user: alice" -- <command>
+    #
+    #   # Traffic routing: A/B testing + feature flags + full canary
+    #   # trafficWeight: 20              # 20% of real Ingress traffic → Darlane pod
+    #   #                               # 0=debug only | 1-99=A/B split | 100=full canary
+    #   #                               # requires ingress.enabled: true + Traefik TraefikService CRD
+    #   # stickySession:
+    #   #   enabled: true               # pin each user to the same backend for the session
+    #   #   cookieName: darlane-ab      # override if multiple apps share the same domain
+    #   #   secure: true                # Secure flag (HTTPS only)
+    #   #   sameSite: lax               # lax | strict | none
+    #
+    #   # Tier 3: telemetry port + volumes
+    #   # telemetryPort: 4318           # emits payment-api-darlane-telemetry ClusterIP Service
+    #   #                               # OTEL collector scrapes here for the Darlane version
+    #   #                               # combine with trafficWeight for side-by-side A/B observability
+    #   # volumes:
+    #   #   - name: pip-cache
+    #   #     mountPath: /root/.cache/pip
+    #   #     claimName: payment-api-pip-cache   # existing PVC — survives pod restarts
+    #   #   - name: dev-config
+    #   #     mountPath: /etc/app-dev
+    #   #     configMapName: payment-api-dev-config  # ConfigMap volume
+    #   #   - name: dev-secrets
+    #   #     mountPath: /run/secrets/dev
+    #   #     secretName: payment-api-dev-creds       # Secret volume
+    #   #     readOnly: true
+    #
+    #   # Tier 2: safety + access control
+    #   # productionOverride: true       # required when environment: prod
+    #   # ttl: "4h"                      # annotation for Kyverno auto-scale-down
+    #   # serviceAccount:
+    #   #   create: true                 # emits SA; portal/CI uses SA token
+    #   #   # name: payment-api-darlane  # defaults to "{appName}-darlane"
+    #   #   # annotations:
+    #   #   #   eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/darlane
 
     # service:
     #   enabled: true
