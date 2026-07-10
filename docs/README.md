@@ -24,4 +24,5 @@ changelog`).
 | Doc | Description |
 |---|---|
 | [app-onboarding](app-onboarding.md) | Golden path from picking a template to a running `tenant-app` — ties together the templates catalog, `gitea-repository`, and `tenant-app`. |
-| [local-dev-tunneling](local-dev-tunneling.md) | Connecting Telepresence/Mirrord to a `tenant-app` namespace for live local development. |
+| [darlane](darlane.md) | In-cluster developer workspace — file sync, traffic mirroring (mirrord), A/B testing, SRE agent workflows, and the `XDarlane` XRD vision. |
+| [guardian](guardian.md) | Guardian Framework vision — platform-injected scanning, audit, and AI code review sidecars for Darlane sessions. Long-term architecture document. |

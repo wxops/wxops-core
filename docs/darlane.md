@@ -136,7 +136,7 @@ Darlane (<appName>-darlane Deployment):
 | Hot-reload on code change | ❌ Image is fixed at injection time | ✅ `fileSync` + hot-reload command |
 | Layer debug env on top of prod env | ❌ No mechanism | ✅ `darlane.env` wins on key collision |
 | Traffic routing — A/B, canary | ❌ Not possible | ✅ `trafficWeight` + Traefik split |
-| scoped RBAC (not prod pod exec) | ❌ Requires `pods/exec` on production pods | ✅ `darlane.rbac` scoped to `<appName>-darlane` |
+| Scoped access without prod pod exec | ❌ Requires `pods/exec` on production pods | ✅ Dedicated `ServiceAccount` — bind your own `Role` to it |
 | Declarative, versioned, auditable | ❌ Ad-hoc `kubectl` command | ✅ XR in git — visible in PR diffs |
 | TTL / auto-cleanup | ❌ Lives until the pod restarts | ✅ Kyverno `ClusterCleanupPolicy` |
 | mirrord traffic mirroring | ❌ No integration path | ✅ Target `<appName>-darlane` from CLI |
@@ -878,12 +878,8 @@ darlane:
     enabled: true
     mountPath: /app
   ttl: "4h"
-  rbac:
-    enabled: true
-    subjects:
-      - kind: Group
-        name: team-alpha-developers
-        apiGroup: rbac.authorization.k8s.io
+  serviceAccount:
+    create: true    # emits a dedicated SA — bind your team's Role to it manually
 ```
 
 **Developer CLI (mirrord mirror — read-only, prod unaffected):**
@@ -973,15 +969,9 @@ darlane:
     mountPath: /app
   trafficWeight: 5                      # after validating with mirror, route 5% for confirmation
   ttl: "2h"                             # tight window — this is an incident, not a dev session
-  rbac:
-    enabled: true
-    subjects:
-      - kind: ServiceAccount            # SRE Agent identity
-        name: sre-agent
-        namespace: platform-agents
-      - kind: Group
-        name: team-oncall
-        apiGroup: rbac.authorization.k8s.io
+  serviceAccount:
+    create: true
+    name: payment-api-darlane           # SRE agent + on-call bind their own Role to this SA
 ```
 
 **Staged validation loop:**
@@ -1073,8 +1063,8 @@ AI Agent generates code change
 **What makes this work:**
 - The agent needs no Vault configuration, no DB credentials, no API keys — they
   are already in the pod
-- The agent uses the scoped `ServiceAccount` (from `darlane.rbac`) to exec and
-  scale — no cluster-admin access required
+- The agent uses the dedicated `ServiceAccount` (from `darlane.serviceAccount`) to exec and
+  scale — the platform team binds a scoped `Role` to it; no cluster-admin access required
 - Mirrord provides real traffic for the agent to test against
 - The platform's logging stack captures all activity automatically
 
@@ -1083,11 +1073,11 @@ AI Agent generates code change
 ```python
 # Agent writes the integration, syncs it to darlane
 subprocess.run(["kubectl", "cp", "claude_integration.py",
-                f"team-alpha/{devspace_pod}:/app/claude_integration.py"])
+                f"team-alpha/{darlane_pod}:/app/claude_integration.py"])
 
 # Trigger a test inside the pod
 result = subprocess.run([
-    "kubectl", "exec", devspace_pod, "-n", "team-alpha",
+    "kubectl", "exec", darlane_pod, "-n", "team-alpha",
     "--", "python", "-c",
     "from claude_integration import run; print(run('test query'))"
 ], capture_output=True)
@@ -1129,14 +1119,16 @@ Human SRE reviews PR — fix already validated against real traffic
 
 **What the platform provides for the SRE Agent:**
 
-Via `darlane.agentAccess.enabled`, the platform composes a `Role` +
-`RoleBinding` granting a designated ServiceAccount (the agent's identity) exactly:
+The composition emits a dedicated `ServiceAccount` for the darlane pod when
+`darlane.serviceAccount.create: true`. The platform team creates a `Role` +
+`RoleBinding` separately and binds it to that SA — granting the agent's identity
+exactly:
 - `deployments/scale` on `<appName>-darlane`
 - `pods/exec`, `pods/portforward`, `pods/log` scoped to darlane pods
 - Read access to the namespace's `Events`
 
-The agent has a real, auditable Kubernetes identity — not cluster-admin access.
-All activity is logged by the platform's audit stack.
+The agent authenticates as the SA — a real, auditable Kubernetes identity, not
+cluster-admin access. All activity is logged by the platform's audit stack.
 
 **Why "no manual reproduction steps" matters:**
 
@@ -1147,10 +1139,6 @@ requested → reproduce locally (or not) → guess at fix → deploy to staging 
 SRE Agent with Darlane: alert → agent activates → fix injected → validated →
 PR ready. Human reviews a validated fix, not a hypothesis. Incident resolution
 time measured in minutes, not hours.
-
-> **Status:** SRE Agent architecture is defined. The platform RBAC primitives
-> (Tier 2 Darlane roadmap) are the prerequisite. The agent intelligence layer
-> is a separate workload that consumes those primitives — see [ROADMAP.md](../ROADMAP.md).
 
 ---
 
@@ -1167,27 +1155,70 @@ See [docs/guardian.md](guardian.md) for the full Guardian architecture and visio
 
 ## Access control
 
-Darlane access is provisioned by the platform alongside the darlane Deployment.
-Developers use their OIDC identity (via the cluster's Impersonate Proxy) — no
-separate credentials required.
+The composition creates a dedicated `ServiceAccount` for the darlane pod when
+`darlane.serviceAccount.create: true`. RBAC is **not** composed automatically —
+the platform team creates the `Role` + `RoleBinding` manually and binds them to
+that `ServiceAccount`.
+
+**Compose the SA (in the XR):**
 
 ```yaml
 darlane:
-  rbac:
-    enabled: true
-    subjects:
-      - kind: Group
-        name: team-alpha-developers    # OIDC group
-        apiGroup: rbac.authorization.k8s.io
+  serviceAccount:
+    create: true
+    name: payment-api-darlane          # defaults to {appName}-darlane
+    annotations:                       # optional — workload identity (IRSA, GCP WI)
+      eks.amazonaws.com/role-arn: arn:aws:iam::123456789:role/darlane
 ```
 
-The platform emits a `Role` + `RoleBinding` granting exactly:
-- Scale `<appName>-darlane` Deployment
-- `pods/exec`, `pods/portforward`, `pods/log` on darlane pods
-- Create/delete pods in the namespace (for mirrord agent)
+**Create the Role + RoleBinding separately (GitOps / platform layer):**
 
-No namespace-wide kubeconfig. No cluster-admin. The scoped `ServiceAccount`
-is what a future W'xOps CLI will use to provide one-command environment access.
+```yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: payment-api-darlane
+  namespace: team-alpha
+rules:
+  - apiGroups: ["apps"]
+    resources: ["deployments/scale"]
+    resourceNames: ["payment-api-darlane"]
+    verbs: ["get", "patch", "update"]
+  - apiGroups: [""]
+    resources: ["pods/exec", "pods/portforward", "pods/log"]
+    verbs: ["create", "get"]
+  - apiGroups: [""]
+    resources: ["pods", "events"]
+    verbs: ["get", "list", "watch"]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-api-darlane
+  namespace: team-alpha
+subjects:
+  - kind: ServiceAccount
+    name: payment-api-darlane
+    namespace: team-alpha
+  - kind: Group                        # also bind developer OIDC group directly
+    name: team-alpha-developers
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: payment-api-darlane
+```
+
+**Why manual RBAC:**
+
+The `Role` rules and subjects differ per team, per environment, and per agent type.
+Composing them inside the XRD would require exposing the full RBAC schema as XR
+parameters — that is the platform team's domain, not the tenant's. Keeping the
+`Role`/`RoleBinding` in GitOps lets the platform team audit and evolve them
+independently of the app lifecycle.
+
+The `ServiceAccount` is composed because it must exist before the pod starts and
+needs a stable, predictable name for the binding to reference.
 
 ---
 
