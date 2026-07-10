@@ -5,6 +5,6 @@ metadata:
   annotations:
     meta.crossplane.io/version: v0.1.0
 spec:
-  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-platform-database-clusters:v0.1.3
+  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-platform-database-clusters:v0.1.4
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
