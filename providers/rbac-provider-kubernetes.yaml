@@ -34,21 +34,27 @@ rules:
     resources: ["providerconfigs", "roles"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # RBAC for ESO's superuser-secret reader (platform-database-clusters)
-  - apiGroups: ["rbac.authorization.k8s.io"]
-    resources: ["roles", "rolebindings"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  - apiGroups: [""]
-    resources: ["serviceaccounts"]
-    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # - apiGroups: ["rbac.authorization.k8s.io"]
+  #   resources: ["roles", "rolebindings"]
+  #   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   # tenant-app workload resources
   - apiGroups: ["apps"]
     resources: ["deployments"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
   - apiGroups: [""]
-    resources: ["services"]
+    resources: ["services", "persistentvolumeclaims", "serviceaccounts"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # networking.k8s.io/ingresses kept for migration — tenant-app now emits IngressRoute,
+  # but existing clusters may still have Ingress objects from the old composition.
   - apiGroups: ["networking.k8s.io"]
     resources: ["ingresses"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  - apiGroups: ["traefik.io"]
+    resources: ["traefikservices", "ingressroutes"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # cert-manager (tenant-app Certificate CR when ingress.tls.clusterIssuer is set)
+  - apiGroups: ["cert-manager.io"]
+    resources: ["certificates"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1

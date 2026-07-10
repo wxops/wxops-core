@@ -49,7 +49,7 @@ packages:
 
   platform-database-clusters:
     package:
-      current: v0.1.3
+      current: v0.1.4
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -57,7 +57,7 @@ packages:
 
   tenant-database:
     package:
-      current: v0.1.3
+      current: v0.1.4
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -65,11 +65,13 @@ packages:
 
   tenant-app:
     package:
-      current: v0.1.5
+      current: v0.2.0
     api:
       served: [v1alpha1]
       storage: v1alpha1
-    description: Tenant application scaffold (Deployment, Service, Ingress, optional devSpace) with catalog metadata, secretsFrom wiring for platform-provisioned Vault/database secrets, rolloutStrategy, golden-path probes, cert-manager TLS, and oauth2-proxy SSO via Traefik middlewares.
+    description: |
+      Tenant application scaffold (Deployment, Service, Traefik IngressRoute, Darlane debug-twin) with cert-manager TLS auto-provisioning,
+      A/B traffic splitting via TraefikService, fileSync emptyDir overlay, multi-source volumes (PVC/ConfigMap/Secret), and oauth2-proxy SSO via Traefik middlewares
 
 # Utility compositions — not yet published as standalone OCI packages.
 utilities:

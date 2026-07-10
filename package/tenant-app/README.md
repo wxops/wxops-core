@@ -2,7 +2,7 @@
 
 Crossplane Configuration package that provisions a tenant application
 scaffold — `Deployment` + `Service` + optional `Ingress` + optional
-`ServiceAccount` (+ optional debug `devSpace` twin), following
+`ServiceAccount` (+ optional debug `darlane` twin), following
 `app.kubernetes.io/*` label conventions.
 
 This package deliberately stops at the application workload: Vault-backed
@@ -80,7 +80,7 @@ spec:
 See [`examples/tenant-app/xr.yaml`](../../examples/tenant-app/xr.yaml) for the
 full set of optional fields (`serviceAccount`, `securityContext`,
 `terminationGracePeriodSeconds`, `imagePullSecrets`, `secretsFrom`,
-`rolloutStrategy`, `devSpace`, `probes`, `ingress.tls`/`ingress.auth`,
+`rolloutStrategy`, `darlane`, `probes`, `ingress.tls`/`ingress.auth`,
 `labels`/`deploymentAnnotations`, `templateId`/`repository.url`), and
 [`docs/tenant-app.md`](../../docs/tenant-app.md) for the complete
 `spec.parameters` reference and the Golden Path Contract.

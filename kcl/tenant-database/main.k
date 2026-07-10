@@ -86,6 +86,7 @@ Composed resources:
   dedicated-cluster    platform.wxops.cloud/v1alpha1            XPlatformDatabaseCluster — only when tier: dedicated.
 
 Vault path written: tenants/{owner}/databases/{dbName}/connection-creds
+
 """
 
 oxr = option("params").oxr
@@ -305,6 +306,18 @@ _connSecretDeletionPolicy = "Delete" if databaseReclaimPolicy == "delete" else "
 #     Create() on recreate.
 _objDeletionPolicy = "Orphan" if databaseReclaimPolicy == "retain" else "Delete"
 
+# ── Observed state (keyed by Object name, Crossplane v2 / function-kcl v0.12.x) ──
+# Used for krm.kcl.dev/ready annotations on desired resources so function-kcl emits
+# READY_TRUE — fixing the native type:Ready condition. String "True" is required;
+# function-kcl v0.12.1 tightened type checks (boolean True no longer accepted).
+_ocds = option("params").ocds or {}
+_isReady = lambda name: str -> bool {
+    _ocd = _ocds[name] if name in _ocds else {}
+    _res = _get(_ocd, "Resource", {})
+    _conds = _get(_get(_res, "status", {}), "conditions", [])
+    len([c for c in _conds if _get(c, "type", "") == "Ready" and _get(c, "status", "") == "True"]) > 0
+}
+
 # ── ESO Password Generator ─────────────────────────────────────────
 # Lives in {clusterNamespace} so the ExternalSecret below (same namespace)
 # can reference it via generatorRef.
@@ -315,7 +328,7 @@ _pwd_gen = {
         name = short + "-pwd-gen"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-pwd-gen"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-pwd-gen") else {})
     }
     spec = {
         deletionPolicy = _objDeletionPolicy
@@ -350,7 +363,7 @@ _conn_bundle = {
         name = short + "-conn-bundle"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-conn-bundle"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-conn-bundle") else {})
     }
     spec = {
         deletionPolicy = _objDeletionPolicy
@@ -429,7 +442,7 @@ _sql_role = {
         name = short + "-sql-role"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-sql-role"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-role") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -480,7 +493,7 @@ _cnpg_database = {
         name = short + "-cnpg-database"
         annotations = {
             "crossplane.io/composition-resource-name" = "cnpg-database"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-database") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -516,7 +529,7 @@ _cluster_usage = {
         name = short + "-role-db-usage"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-role-db-usage"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-role-db-usage") else {})
     }
     spec = {
         of = {
@@ -557,7 +570,7 @@ _cluster_usage_conn = {
         name = short + "-conn-role-usage"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-conn-role-usage"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-conn-role-usage") else {})
     }
     spec = {
         of = {
@@ -605,7 +618,7 @@ _push_secret = {
         name = short + "-push-secret"
         annotations = {
             "crossplane.io/composition-resource-name" = "tenant-push-secret"
-        }
+        } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-push-secret") else {})
     }
     spec = {
         providerConfigRef = {name = "default"}
@@ -662,7 +675,7 @@ _ded_cluster = {
     metadata.name = short + "-dedicated-cluster"
     metadata.annotations = {
         "crossplane.io/composition-resource-name" = "dedicated-cluster"
-    }
+    } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-dedicated-cluster") else {})
     spec.parameters = {
         clusterName = _dedClusterName
         namespace = _dedNs

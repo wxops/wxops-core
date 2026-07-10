@@ -9,9 +9,10 @@ Status: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-]` decided not to
     - [v0.2.0 / v0.2.1 / v0.2.5 / v0.2.6 — XTenantApp baseline + SSO Middle Integration](#v020--v021--v025--v026--xtenantapp-baseline--sso-middle-integration)
     - [v0.2.2 / v0.2.4 — XTenantDatabase dynamic tier resolution](#v022--v024--xtenantdatabase-dynamic-tier-resolution)
     - [v0.2.7 — Gitea XRD additions](#v027--gitea-xrd-additions)
+    - [v0.3.0 — Darlane + IngressRoute + KCL readiness fix](#v030--darlane--ingressroute--kcl-readiness-fix)
   - [Active / Planned](#active--planned)
-    - [DevSpace Phase 3 — own minor version bump](#devspace-phase-3--own-minor-version-bump)
-    - [Guardian Framework — platform-injected quality \& security](#guardian-framework--platform-injected-quality--security)
+    - [Composition Lifecycle \& Breaking Change Safety](#composition-lifecycle--breaking-change-safety)
+    - [Darlane — shipped in v0.3.0](#darlane--shipped-in-v030)
     - [Vault Database Secrets Engine (not started)](#vault-database-secrets-engine-not-started)
   - [Decided / out of scope](#decided--out-of-scope)
 
@@ -30,7 +31,7 @@ Status: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-]` decided not to
 - [x] `appFlavor` label (`webapp`, `ai`, `ai-webapp`, `geo-webapp`, `search-webapp`)
 - [x] `environment` label (`dev`/`staging`/`prod`) — pure metadata
 - [x] `probes.{liveness,readiness,startup}` — golden-path `/healthz`/`/readyz` defaults
-- [x] `devSpace` debug-twin Deployment (`<appName>-dev`, replicas 0, no Service/Ingress, shares env/envFrom)
+- [x] `darlane` debug-twin Deployment (`<appName>-darlane`, replicas 0, no Service/Ingress, shares env/envFrom)
 - [x] Docs: Golden Path Contract
 - [x] Support SSO Middileware reference using `traefik` with `cross-namespace` convention
 - [x] Support ImagePullSecrets, ServiceAccount and Security Context. Also flag image string for easier updated by `kustomize`
@@ -50,145 +51,119 @@ Status: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-]` decided not to
 - [x] `gitea-team`: `enableActions` / `actionsReadOnly` / `enablePackages` / `packagesReadOnly` via `null_resource` + Gitea API PATCH
 - [x] `gitea-org`: `repoAdminChangeTeamAccess` boolean (default `false`)
 - [x] Docs: updated parameters tables for all three XRDs
-- [-] Build Matrix Permission for setting up team permissions
+
+### v0.3.0 — Darlane + IngressRoute + KCL readiness fix
+
+**`XTenantApp` — Darlane developer workspace**
+
+- [x] `devSpace` renamed to `darlane` throughout XRD, KCL, and docs
+- [x] `IngressRoute` (Traefik CRD) replaces standard Kubernetes `Ingress` for all apps — enables zero-downtime A/B weight switching without resource type changes
+- [x] `ingress.tls.clusterIssuer` — auto-emits `cert-manager.io/v1 Certificate` CR; cert-manager provisions the TLS Secret into `tls.secretName`
+- [x] `darlane.fileSync` — writable `emptyDir` volume at `mountPath`; `initContainer` pre-populates from image (`cp -rp /app/.`) including dotfiles; works with `readOnlyRootFilesystem: true`
+- [x] `darlane.trafficWeight` (0–100) — Traefik `TraefikService` weighted split; `IngressRoute` backend switches in-place (same Object, no deletion gap)
+- [x] `darlane.stickySession` — per-session cookie pinning on the weighted split
+- [x] `darlane.telemetryPort` — dedicated `ClusterIP` Service for OTEL/Prometheus on the darlane pod
+- [x] `darlane.productionOverride` + `darlane.ttl` — double opt-in gate for prod; Kyverno `ClusterCleanupPolicy` auto-scales down expired pods
+- [x] `darlane.rbac` — scoped `Role`/`RoleBinding` for developer access to the darlane Deployment only
+- [x] `darlane.serviceAccount` — dedicated SA with optional workload identity annotations
+- [x] `volumes[]` and `darlane.volumes[]` expanded: `configMapName` and `secretName` sources alongside `claimName` (PVC); optional `items[]` key-to-path projections
+- [x] provider-kubernetes RBAC: added `traefik.io` (IngressRoute, TraefikService) and `cert-manager.io` (Certificate) rules; retained `networking.k8s.io/ingresses` for migration
+
+**KCL readiness fix — all packages**
+
+- [x] `platform-database-clusters`: `_isReady` / `krm.kcl.dev/ready: "True"` applied to all composed `Object` resources — fixes Crossplane v2.3 + function-kcl v0.12.1 `type: Ready` always-False bug
+- [x] `tenant-database`: same fix applied to all composed `Object` resources
 
 ---
 
 ## Active / Planned
 
-### DevSpace Phase 3 — own minor version bump
+### Composition Lifecycle & Breaking Change Safety
 
-DevSpace turns the existing debug-twin Deployment into a first-class developer workspace:
-exec into a live environment with real secrets, debug with real traffic, validate hotfixes
-before CI. The SRE Agent and AI agent workflows depend on these primitives.
+Every composition update is immediately applied to **all** existing `XTenantApp` resources
+(Crossplane default: `compositionUpdatePolicy: Automatic`). Most changes are additive and safe —
+new optional fields with defaults pass through without touching existing resources. But some changes
+are structurally breaking and can leave the entire fleet in a permanent reconciliation error state
+with no easy recovery path.
 
-**Tier 1 — make the pod usable (must-have for release)**
+The core failure mode: Kubernetes rejects in-place updates to immutable fields
+(`Deployment.spec.selector`, PVC access modes, etc.). Crossplane's reconciliation loop enters a
+permanent error and cannot self-heal — the old Deployment keeps running, but the XR is stuck and
+any attempt to change it risks triggering a cascade delete of all composed resources (Deployment,
+Service, Ingress), causing downtime. Recovery is manual and stressful under pressure.
 
-- [ ] `devSpace.resources` — separate resource requests/limits for the dev pod. Debugging
-  tools (language servers, profilers, IDE agents) need more memory than the production app.
-  Default: no limits (dev pods cost-controlled by namespace ResourceQuota).
-- [ ] `devSpace.securityContext` — opt-in overrides: `runAsUser`, `runAsGroup`,
-  `readOnlyRootFilesystem` (default `false` for devSpace — writable rootfs allows
-  `apt install`/`pip install` without a custom image). Single highest-impact field for
-  making `kubectl exec` useful.
-- [ ] `devSpace.env` — extra environment variables layered on top of main app env.
-  Lets devs set `DEBUG=true`, `LOG_LEVEL=trace`, `NODE_OPTIONS=--inspect=...` without
-  touching production config. devSpace wins on key collision.
-- [ ] `devSpace.args` — container args override (parallel to `devSpace.command`).
-  Useful for passing debug flags without replacing the entire entrypoint.
+**Phase 1 — classification & documentation**
 
-**Tier 2 — safety & access control (prerequisite for traffic interception)**
+- [ ] **Breaking change taxonomy** — formally classify every composition change type:
+  - `safe` — additive: new optional fields, new composed resources with conditional emit,
+    changes to pod template labels/annotations only
+  - `careful` — in-place update: changes to resource spec fields (Crossplane patches the
+    existing object; Kubernetes applies it). Risk depends on the field.
+  - `breaking` — requires recreation: changes to `spec.selector` labels (Deployment),
+    PVC access modes or storage class, `composition-resource-name` rename (delete + recreate),
+    XRD field type change with pruning
+  - Maintain a `BREAKING.md` section per package listing which changes fall in each tier.
+    Commit authors must classify their change before merging.
 
-- [ ] `devSpace.productionOverride` — when `environment: prod`, `devSpace.enabled: true`
-  alone is not enough; also require `devSpace.productionOverride: true`. KCL:
-  `devSpaceEnabled = requested and (environment != "prod" or prodOverride)`.
-  Self-documenting, visible in XR diffs and PRs.
-- [ ] Scoped `ServiceAccount` + `Role`/`RoleBinding` — emit RBAC granting exactly
-  `pods/exec`, `pods/portforward`, `deployments/scale` on `<appName>-dev` only.
-  This is what a future CLI hands to developers instead of a namespace-wide kubeconfig.
-  Also the minimum RBAC Mirrord operator mode needs to target devSpace pods.
-- [ ] Auto-scale-down / TTL — Kyverno policy or CronJob that scales `<appName>-dev` to
-  `0` after N hours of inactivity (configurable via `wxops.cloud/devspace-ttl: "4h"`).
-  An abandoned devSpace with a live Mirrord session silently drops intercepted requests.
+- [ ] **Pre-flight check tool** — `make composition-diff` that compares the incoming
+  composition against all live XR states and flags any immutable field conflict before apply.
+  Catches selector label additions, resource renames, and type changes that would leave XRs stuck.
 
-**Tier 3 — traffic interception & live debugging**
+**Phase 2 — controlled rollout**
 
-Headline capability: attach to real cluster traffic for hotfix debugging without touching
-the production workload.
+- [ ] **CompositionRevision channels** — label each published `CompositionRevision` with a
+  `channel` (`stable` / `canary`). New XRs default to `stable`. Platform operators advance
+  the channel label after validating canary. XRs with `compositionRevisionSelector:
+  matchLabels: channel: stable` never receive breaking updates until explicitly migrated.
+  CI publishes to `canary` first; promotion to `stable` is a manual gate.
 
-- [ ] `devSpace.tunneling.mode` — `"none"` (default), `"mirrord"`, `"telepresence"`.
-  Controls annotations/labels the composition sets on the devSpace Deployment. Does NOT
-  install Mirrord/Telepresence — cluster prerequisites, like cert-manager for TLS.
-- [ ] `devSpace.tunneling.targetDeployment` — which Deployment to mirror/intercept from.
-  Defaults to `<appName>`.
-- [ ] `devSpace.tunneling.mirrord` — Mirrord-specific config:
-  - `mode`: `"mirror"` (default, read-only — safe for observation) or `"steal"` (full
-    intercept — requires `productionOverride` if `environment: prod`)
-  - `filter`: HTTP header filter for steal mode (e.g. `x-debug-user: alice`)
-  - `operatorRef`: optional mirrord-operator policy CRD name
-- [ ] `devSpace.tunneling.telepresence` — Telepresence-specific config:
-  - `intercept`: set up intercept annotations
-  - `previewURL`: enable Telepresence preview URL generation
-- [ ] `devSpace.debugPort` — expose a debugger port (`--inspect`, `debugpy`, `dlv`) via
-  ClusterIP-only Service on `<appName>-dev`. Works standalone or with tunnel tools.
-- [ ] `devSpace.volumes` — PVC for persistent tool installation that survives pod restarts.
+- [ ] **Per-XR revision pinning in the portal** — surface `compositionRevisionRef` as a
+  portal control so operators can pin individual apps to a known-good revision before a fleet
+  update, then migrate one-by-one rather than all-at-once.
 
-**Tier 3b — documentation**
+**Phase 3 — safe migration playbook for breaking changes**
 
-- [x] `docs/devspace.md` — comprehensive DevSpace guide (exec, file sync, mirrord,
-  telepresence, A/B testing, AI agent workflow, SRE Agent, Guardian overview, safety model)
-- [ ] VS Code integration docs — attaching to `<appName>-dev` via Kubernetes extension +
-  Mirrord VS Code plugin for one-click traffic mirroring
+- [ ] **Management policy escape hatch** — document and test the
+  `managementPolicies: [Observe]` pattern: temporarily set an XR to `Observe`-only so
+  Crossplane stops reconciling it, make the destructive change manually (delete Deployment,
+  recreate with new selector), then restore `managementPolicies: [*]`. Prevents cascade
+  delete while still allowing the operator to do the recreation in a controlled way.
 
-**Tier 4 — advanced / future**
+- [ ] **Selector label freeze policy** — once an app is in `staging` or `prod`, the
+  composition must never add a new label to `spec.selector.matchLabels`. New labels go to
+  `spec.template.metadata.labels` only (pod labels, not selector labels). Enforce via a
+  pre-commit check that diffs `selector.matchLabels` against the previous composition version.
 
-- [ ] Ephemeral DB branch — provision a throwaway CNPG clone via `XTenantDatabase`
-  (tier: dedicated, small) so dev mistakes can't touch prod data. Pairs with steal mode:
-  real traffic, writes go to ephemeral clone.
-- [ ] W'xOps CLI — wraps Mirrord/Telepresence workflow: scale up devSpace, configure
-  tunnel, attach debugger, tear down on exit. Separate repo; design RBAC shape (Tier 2)
-  with the CLI auth model.
+- [ ] **Blue/green composition migration** — for fleet-wide breaking changes, a scripted
+  path: scale up new Deployment (new selector) alongside old, shift Service selector, scale
+  down old, patch XR to match new state. Crossplane then takes over managing the new
+  Deployment. Avoids any downtime window.
+
+- [ ] **Status subresource for migration state** — write `status.compositionMigration` to
+  the XR during a managed migration: `pending | in-progress | complete | failed`. Portal
+  can surface this as a banner so operators know which apps need action after a breaking
+  composition release.
+
+**Why this matters more than normal controller upgrades:** Crossplane compositions are applied
+fleet-wide and immediately. A broken composition revision can affect every tenant app
+simultaneously — not just new deployments. The blast radius is the entire platform, not one
+service. Until Phase 1 (classification) is in place, treat every composition change to
+`selector`-touching fields as a major version bump and coordinate with all teams before release.
 
 ---
 
-### Guardian Framework — platform-injected quality & security
+### Darlane — shipped in v0.3.0
 
-Guardian injects sidecars into the devSpace pod — quality and security enforcement that
-runs alongside the developer's process without requiring them to install anything.
+All core Darlane capabilities shipped in v0.2.x and v0.3.0. The `darlane.*` block
+on `XTenantApp` is stable and complete. Further evolution moves to a standalone
+`XDarlane` XRD — see [docs/darlane.md](docs/darlane.md#whats-next-xdarlane-xrd) for
+the vision and architecture.
 
-The platform owns the devSpace pod spec. Guardian is the platform's contribution to that
-pod: scanning, audit trail, AI code review, pre-installed tools — all without the
-developer lifting a finger.
-
-**Recommended rollout order:**
-```
-Tier 1 + Tier 2 + Guardian Phase 1 → Tier 3 + Guardian Phase 2 → Guardian Phase 3
-```
-
-**Phase 1 — scanning & tooling injection**
-
-- [ ] `guardian-tools` init container — pre-installs approved debugging tools
-  (`debugpy`, `dlv`, `node --inspect`, `pprof`, `curl`, `jq`, `psql`, `grpcurl`) into
-  a shared `emptyDir` at `/opt/guardian-tools`. Rootfs stays read-only; tools come from
-  the init container. Solves "writable rootfs just to install `curl`" cleanly.
-- [ ] `guardian-scan` sidecar — runs Trivy/Grype + Semgrep continuously against the
-  devSpace filesystem. Watches for new CVEs (dependencies), SAST findings (code changes),
-  and image layer issues. Reports via pod annotations + structured logs. Advisory only —
-  enforcement stays in CI/CD.
-- [ ] Guardian tools catalog — platform-maintained container image per language ecosystem
-  (`node`, `python`, `go`, general). Versioned, scannable, auditable.
-
-**Phase 2 — audit & compliance**
-
-- [ ] `guardian-audit` sidecar — captures all devSpace activity for compliance and
-  incident forensics: shell commands (via `auditd` / shared PID namespace), file changes
-  (inotify), network connections (conntrack/eBPF), tunnel session events.
-  Structured JSON logs → SIEM. Makes steal mode on production *defensible*, not just gated.
-- [ ] Guardian findings as Crossplane status — surface `status.guardian.lastScanResult`,
-  `status.guardian.highFindings` on `XTenantApp`. Kyverno policies can alert when
-  devSpace has been up >2h with unresolved HIGH findings.
-
-**Phase 3 — AI guardrail (depends on LLM infrastructure)**
-
-- [ ] `guardian-ai` sidecar — real-time code review that watches file changes in the
-  devSpace pod and provides feedback before commit. Designed for hotfix-under-pressure
-  scenarios where CI is bypassed:
-  - Detects risky patterns: raw SQL, missing input validation, privilege escalation
-  - Flags drift from established codebase patterns
-  - Optional: requires guardian approval before `git push` from devSpace pod
-  - LLM must be self-hosted (Ollama in-cluster, private Claude endpoint behind VPN) —
-    the pod has access to production secrets and real traffic; no third-party API calls
-
-**XR interface:**
-```yaml
-devSpace:
-  guardian:
-    enabled: true
-    scanning: true   # Phase 1
-    audit: true      # Phase 2
-    ai: false        # Phase 3 — opt-in, requires LLM infra
-    tools: true      # Phase 1
-```
+- [x] Tier 1: resources, securityContext, env overlay, args, fileSync
+- [x] Tier 2: productionOverride, ttl, rbac, serviceAccount, Kyverno TTL enforcement
+- [x] Traffic: trafficWeight, stickySession, telemetryPort, TraefikService A/B split
+- [x] Volumes: PVC, ConfigMap, Secret with key-to-path projections
+- [x] Docs: comprehensive guide at [docs/darlane.md](docs/darlane.md)
 
 ---
 
@@ -241,5 +216,9 @@ These were evaluated and rejected. Don't re-litigate without new information.
   is dynamic parameterized resource graphs with cross-resource outputs, not static namespace
   scaffolding.
 - [-] **`externalSecrets` / `database` toggles in `tenant-app`** — removed. `tenant-app`
-  stays focused on `Deployment`/`Service`/`Ingress`/`devSpace`. Vault-backed secrets and
+  stays focused on `Deployment`/`Service`/`Ingress`/`darlane`. Vault-backed secrets and
   databases are provisioned separately and consumed via `envFrom.secretRef`.
+- [-] **`Gitea-Team XRs`** - Not adopt **Matrix Permission** for setting up Gitea Team of Org
+- [-] **Tunneling XRD block** - removed — mirrord CLI needs no manifest config
+- [-] **debugPort, VS Code docs, Ephemeral DB branch, W'xOps CLI:** - moved to `XDarlane` XRD scope
+
