@@ -24,13 +24,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/VERSIONS.yaml)
-🔍 [Diff vs 0.2.7](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.7...v0.3.0)
+🔍 [Full series diff (v0.2.0 → v0.3.0)](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.0...v0.3.0)
 
-
-> ⚠️ **API version bump (0.2.7 → 0.3.0)** — major/minor change usually means a new or
-> changed XRD API version (`spec.versions[]`). Check the diff above and
-> [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/VERSIONS.yaml)
-> for affected packages, and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/docs)
+> ⚠️ **Major/minor version bump** — this diff covers the entire **0.2.x**
+> patch series (v0.2.0 through v0.2.7) so no intermediate patch is missed.
+> Check [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/VERSIONS.yaml)
+> for affected packages and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/docs)
 > for schema changes.
 ## [0.2.7] — 2026-06-30
 
@@ -125,13 +124,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/VERSIONS.yaml)
-🔍 [Diff vs 0.1.1](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.1...v0.2.0)
+🔍 [Full series diff (v0.1.0 → v0.2.0)](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.1.0...v0.2.0)
 
-
-> ⚠️ **API version bump (0.1.1 → 0.2.0)** — major/minor change usually means a new or
-> changed XRD API version (`spec.versions[]`). Check the diff above and
-> [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/VERSIONS.yaml)
-> for affected packages, and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/docs)
+> ⚠️ **Major/minor version bump** — this diff covers the entire **0.1.x**
+> patch series (v0.1.0 through v0.1.1) so no intermediate patch is missed.
+> Check [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/VERSIONS.yaml)
+> for affected packages and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.2.0/docs)
 > for schema changes.
 ## [0.1.1] — 2026-05-30
 
