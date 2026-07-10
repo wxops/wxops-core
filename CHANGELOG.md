@@ -15,6 +15,23 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.3.0] — 2026-07-10
+
+### Features
+
+- Support new darlane module for xtenantapp dev environment ([`5ad0e60`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/5ad0e601f3acc72e69b090a4c037e863a2c5d65a))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/VERSIONS.yaml)
+🔍 [Diff vs 0.2.7](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.7...v0.3.0)
+
+
+> ⚠️ **API version bump (0.2.7 → 0.3.0)** — major/minor change usually means a new or
+> changed XRD API version (`spec.versions[]`). Check the diff above and
+> [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/VERSIONS.yaml)
+> for affected packages, and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.0/docs)
+> for schema changes.
 ## [0.2.7] — 2026-06-30
 
 ### Chores
@@ -156,6 +173,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.3.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.0
 [0.2.7]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.7
 [0.2.6]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.6
 [0.2.5]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.5
@@ -166,5 +184,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.2.7...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.0...HEAD
 
