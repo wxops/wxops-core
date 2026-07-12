@@ -140,7 +140,7 @@ the listed keys are mounted, at the given relative paths inside `mountPath`.
 If enabled, a second `<appName>-dev` Deployment is created alongside the
 main one — same `image`/`env`/`envFrom`/secrets, scaled to `0` by default
 and with **no `Service`/`IngressRoute` of its own** (zero external exposure).
-Scale it up on-demand, sync code with mutagen, or route real traffic via
+Scale it up on-demand, sync code with `wxops darlane sync`, or route real traffic via
 `trafficWeight` for A/B testing and feature flags. Use `mirrord` CLI directly
 against the darlane pod for local development with real cluster env and secrets.
 See [darlane.md](darlane.md) for the full developer guide.
@@ -160,8 +160,26 @@ See [darlane.md](darlane.md) for the full developer guide.
 | `darlane.securityContext` | `object` | — | Security context overrides (`runAsUser`, `runAsGroup`, `readOnlyRootFilesystem`, etc). Applied on top of main app `securityContext`. `readOnlyRootFilesystem` defaults to `false` for darlane so `apt`/`pip` installs work without a custom image. |
 | `darlane.productionOverride` | `boolean` | `false` | Required when `environment: prod` to enable darlane. Double opt-in — visible in XR diffs and PRs. |
 | `darlane.ttl` | `string` | — | Adds `wxops.cloud/darlane-ttl` annotation to the dev Deployment (e.g. `"4h"`). Enforcement is a separate Kyverno policy. |
-| `darlane.trafficWeight` | `integer` | `0` | When `> 0` (and `ingress.enabled: true`), emits a `ClusterIP` Service for the darlane pod and a Traefik `TraefikService` weighted split. The `IngressRoute` backend switches to the `TraefikService` so real user traffic is split — zero downtime, same Object updated in-place. `0` = debug only · `1–99` = A/B split · `100` = full canary. Requires Traefik with `TraefikService` CRD. |
-| `darlane.telemetryPort` | `integer` | — | When set, emits a `ClusterIP` Service named `{appName}-darlane-telemetry` on this port. Provides stable in-cluster DNS for the OTEL collector, Prometheus, or any secondary port the darlane pod exposes. Common values: `4317` (OTEL gRPC), `4318` (OTEL HTTP), `9090` (Prometheus). Combine with `trafficWeight` for side-by-side A/B observability — one scrape target per version. |
+
+
+#### Traffic routing
+
+Route a slice of real `IngressRoute` traffic to the darlane pod for A/B testing,
+feature flags, or explicit developer opt-in. Three independent controls compose freely —
+see [Combining traffic modes](darlane.md#combining-traffic-modes) in the Darlane guide
+for the full interaction table and Traefik rule details.
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `darlane.trafficWeight` | `integer` | `0` | Percentage of real traffic routed to the darlane pod (`0` = debug only, `1–99` = A/B split, `100` = full canary). Emits a `ClusterIP` Service and a Traefik `TraefikService` weighted split. Zero-downtime — the `IngressRoute` Object is updated in-place. Requires `ingress.enabled: true`. |
+| `darlane.stickySession.enabled` | `boolean` | `false` | Pin browser clients to the same backend for their session lifetime via a Traefik cookie. Requires `trafficWeight > 0`. Without this, a single user may hit both variants per-request. Browser only — API clients that don't forward cookies remain per-request. |
+| `darlane.stickySession.cookieName` | `string` | `"darlane-ab"` | Session cookie name Traefik sets. Override if multiple apps share the same domain. |
+| `darlane.stickySession.secure` | `boolean` | `true` | Set the `Secure` flag on the cookie (HTTPS only). |
+| `darlane.stickySession.sameSite` | `string` | `"lax"` | `lax` · `strict` · `none` (requires `secure: true`). |
+| `darlane.headerRouting.enabled` | `boolean` | `false` | Add a higher-priority `IngressRoute` rule that pins requests carrying a specific header directly to the darlane pod — bypasses `trafficWeight` and cookie assignment entirely. Works with or without `trafficWeight`. Requires `ingress.enabled: true`. |
+| `darlane.headerRouting.header` | `string` | — | HTTP header name to match (e.g. `X-Target-Env`). Case-sensitive. Required when `enabled: true`. |
+| `darlane.headerRouting.value` | `string` | — | Header value to match (e.g. `darlane`). Case-sensitive. Required when `enabled: true`. |
+| `darlane.telemetryPort` | `integer` | — | Emits a `ClusterIP` Service named `{appName}-darlane-telemetry` on this port for OTEL/Prometheus scraping. Common values: `4317` (OTEL gRPC), `4318` (OTEL HTTP), `9090` (Prometheus). |
 
 #### `darlane.volumes` — volumes
 

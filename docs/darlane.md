@@ -30,12 +30,16 @@ your application needs, scaled to zero at rest.
     - [4 — Traffic interception (Telepresence)](#4--traffic-interception-telepresence)
   - [A/B testing and feature flags](#ab-testing-and-feature-flags)
     - [Sticky sessions](#sticky-sessions)
+    - [Header routing](#header-routing)
+    - [Combining traffic modes](#combining-traffic-modes)
+    - [Adding mirrord to the mix](#adding-mirrord-to-the-mix)
     - [Feature flags](#feature-flags)
+    - [Honest trade-offs vs. dedicated flag services](#honest-trade-offs-vs-dedicated-flag-services)
   - [Combined workflow patterns](#combined-workflow-patterns)
     - [Pattern A — Feature flag / A/B test (manifest-only, no laptop required)](#pattern-a--feature-flag--ab-test-manifest-only-no-laptop-required)
     - [Pattern B — Local code handles real users (trafficWeight + mirrord steal)](#pattern-b--local-code-handles-real-users-trafficweight--mirrord-steal)
     - [Pattern C — Observe real traffic locally (mirrord mirror, read-only)](#pattern-c--observe-real-traffic-locally-mirrord-mirror-read-only)
-    - [Pattern D — Code sync to pod (mutagen + fileSync, in-cluster)](#pattern-d--code-sync-to-pod-mutagen--filesync-in-cluster)
+    - [Pattern D — Code sync to pod (wxops darlane sync + fileSync, in-cluster)](#pattern-d--code-sync-to-pod-wxops-darlane-sync--filesync-in-cluster)
     - [Choosing a pattern](#choosing-a-pattern)
   - [Scenario reference](#scenario-reference)
     - [Tool × scenario matrix](#tool--scenario-matrix)
@@ -290,23 +294,23 @@ darlane:
     mountPath: /app    # main app's readOnlyRootFilesystem setting
 ```
 
-**Developer side** — use [mutagen](https://mutagen.io/) for continuous sync:
+**Developer side** — use `wxops darlane sync` for continuous sync:
 
 ```bash
-# One-time session setup
-mutagen sync create --name payment-api-darlane \
-  ./src \
-  k8s://team-alpha/payment-api-darlane-<hash>:/app
+# Watch ./src and stream changes into the pod's /app
+wxops darlane sync payment-api --local ./src --remote /app
 
-# Files sync on every save. Pod hot-reloads automatically.
+# Exclude build artefacts and logs
+wxops darlane sync payment-api --local ./src --exclude '*.log' --exclude '__pycache__/'
+
+# Target a different environment (default: dev)
+wxops darlane sync payment-api --env staging
+
+# Files stream on every save (~100 ms debounce). Pod hot-reloads automatically.
 # ANTHROPIC_API_KEY is already in the pod — no export, no .env file.
 
-# When done
-mutagen sync terminate payment-api-darlane
+# Ctrl+C to stop sync
 ```
-
-Or [VS Code Remote - Kubernetes](https://marketplace.visualstudio.com/items?itemName=ms-kubernetes-tools.vscode-kubernetes-tools)
-to open the pod directly as a workspace in your IDE.
 
 **Why this matters for AI development specifically:**
 
@@ -316,7 +320,7 @@ A local mock is insufficient; a full CI/CD cycle is too slow.
 
 ```
 Change prompt template locally
-  → mutagen syncs in ~1 second
+  → wxops darlane sync streams the change (~100 ms debounce)
   → uvicorn --reload picks it up
   → pod sends real API request with real ANTHROPIC_API_KEY
   → real response in the logs
@@ -434,6 +438,113 @@ service-to-service calls, CLI tools) remain per-request regardless of this setti
 For API-client A/B testing, use a dedicated feature flag service with SDK-level
 targeting instead.
 
+### Header routing
+
+Sticky sessions solve session coherence for browser clients that forward cookies. For
+developer or QA opt-in — or for API clients and CLI tools that never send cookies —
+`headerRouting` gives you explicit, caller-controlled pinning without any session state.
+
+Any request that carries the configured header is routed directly to the darlane pod,
+bypassing the `TraefikService` weighted split entirely. All other requests continue to
+follow `trafficWeight` as normal.
+
+```yaml
+darlane:
+  enabled: true
+  trafficWeight: 0          # header routing works with or without a traffic weight
+  headerRouting:
+    enabled: true
+    header: X-Target-Env   # header name — case-sensitive
+    value: darlane         # value to match — case-sensitive
+```
+
+```bash
+# QA engineer — opt in from curl, no cookie, no session assignment
+curl -H "X-Target-Env: darlane" https://payment-api.example.com/api/checkout
+
+# Browser developer extension injects the header for that developer's session
+# — everyone else still hits the main app, unaffected
+```
+
+This is not stickiness. There is no cookie, no session assignment, no state. Each
+request with the header is independently pinned; each request without the header
+follows `trafficWeight`. The caller is entirely in control.
+
+The darlane `ClusterIP` Service is emitted whenever header routing is active, even
+when `trafficWeight: 0` — you do not need to set a traffic weight to enable header
+routing. The Traefik `TraefikService` (weighted split) is only emitted when
+`trafficWeight > 0`.
+
+**How Traefik prioritises the routes:**
+
+The composition emits two `IngressRoute` rules. Traefik assigns higher priority
+automatically to the rule with more matchers — `Host + PathPrefix + Headers` beats
+`Host + PathPrefix` — so no explicit `priority` field is needed:
+
+```
+# Wins — header match, direct to darlane ClusterIP Service
+Host(`payment-api.example.com`) && PathPrefix(`/`) && Headers(`X-Target-Env`, `darlane`)
+  → payment-api-darlane
+
+# Falls through — catch-all, weighted split or main app
+Host(`payment-api.example.com`) && PathPrefix(`/`)
+  → payment-api-weighted (TraefikService) or payment-api (main app)
+```
+
+### Combining traffic modes
+
+`trafficWeight`, `stickySession`, and `headerRouting` are independent and compose
+freely. The table below shows the most useful combinations:
+
+| `trafficWeight` | `stickySession` | `headerRouting` | Behaviour |
+|---|---|---|---|
+| `0` | — | disabled | Debug only — no external traffic reaches darlane. |
+| `0` | — | enabled | **Explicit opt-in only.** Requests with the header go to darlane; everyone else hits the main app. No random traffic spill. Good for internal QA without affecting users. |
+| `20` | disabled | disabled | **Raw A/B split.** Each request is independently 80/20 — the same user may see both versions within a session. |
+| `20` | enabled | disabled | **Cohort A/B.** Traefik cookie pins browser sessions to one variant for the session lifetime. Required for a valid A/B measurement. |
+| `20` | enabled | enabled | **Cohort A/B + developer escape hatch.** Normal traffic splits with stickiness. Any request carrying the header bypasses both the split and the cookie assignment — goes directly to darlane regardless. Useful for QA opt-in alongside a live canary. |
+| `100` | — | disabled | **Full canary.** All traffic goes to darlane. |
+
+**The composition rule:**
+
+`headerRouting` adds a second, higher-priority route to the `IngressRoute`. `trafficWeight`
+controls what the lower-priority catch-all route points to. They are layered, not mutually
+exclusive — the header route wins first; everything else falls through to the weight.
+
+### Adding mirrord to the mix
+
+mirrord is a session-bound CLI tool — it runs on the developer's machine and
+mirrors or steals traffic at the pod level without changing any XR parameter. It
+layers on top of the manifest controls to unlock case studies that neither side can
+cover alone.
+
+| Traffic config | mirrord mode | Target | What you get |
+|---|---|---|---|
+| `trafficWeight: 0` | `mirror` | `<appName>-darlane` | **Silent observer.** Production traffic is copied to your local process read-only. Darlane pod is running; prod completely untouched. Safe in any environment. |
+| `trafficWeight: 0` | `mirror` | `<appName>` | **Direct production tap.** No darlane as a traffic sink — copy straight from the main Deployment. Observe real request shapes without touching a single resource. |
+| `trafficWeight: 0` + `headerRouting` | `steal` + `--filter` | `<appName>-darlane` | **Scoped developer steal.** The header gates which requests reach darlane at the Ingress; `--filter` narrows to only those at the pod. Two independent guards. QA sends the header; their requests reach your local code. Everyone else stays on the main app. |
+| `trafficWeight: 20` + `stickySession` | `mirror` | `<appName>-darlane` | **Observe the canary cohort.** Cohort B users land on darlane (cookie-pinned); your local process receives read-only copies of their requests. Darlane pod still serves responses — you only watch. |
+| `trafficWeight: 20` + `stickySession` | `steal` | `<appName>-darlane` | **Live canary served locally.** Darlane's 20% share is stolen to your laptop. Cohort B users are now served by your local process. Iterate code; real responses go back to real users. |
+| `trafficWeight: 100` | `mirror` | `<appName>-darlane` | **Full canary observation.** All traffic lands on darlane; you mirror it locally for debugging while the pod handles all responses. |
+
+**The safest steal pattern — header filter as a double guard:**
+
+```bash
+# headerRouting gates at the Ingress; --filter gates at the pod.
+# Only the opt-in header requests ever reach local code.
+mirrord exec \
+  --target deployment/<appName>-darlane \
+  --target-namespace <namespace> \
+  --steal \
+  --filter "X-Target-Env: darlane" \
+  -- uvicorn main:app --reload
+```
+
+With `headerRouting.header: X-Target-Env` active in the XR, only requests carrying
+that header reach the darlane pod at the Ingress level. mirrord's `--filter` then
+narrows further at the pod level. Production users never touch local code — even if
+the `--filter` flag is accidentally omitted.
+
 ### Feature flags
 
 The darlane Deployment inherits `env` and `envFrom` from the main app, but you
@@ -459,11 +570,44 @@ Metrics come from the same Prometheus stack. No feature flag service required.
 > drops. This is a developer-controlled tool for validation — not a replacement
 > for a production traffic-splitting strategy (use ArgoCD Rollouts for that).
 
+### Honest trade-offs vs. dedicated flag services
+
+Darlane's traffic controls are **not** a replacement for a mature feature flag SDK or
+A/B testing platform. We are honest about that.
+
+**Where Darlane genuinely wins:**
+
+- No SDK, no code change — toggle via env var or image tag in the XR; works for any language
+- GitOps audit trail — flag state lives in git, visible in PR diffs and review
+- Real infrastructure — the pod has real Vault secrets and DB connections, not a simulation
+- Pod-level fault isolation — a darlane crash only affects the routed percentage
+
+**Where a dedicated service wins — and you should use one:**
+
+- **Per-user targeting** — Darlane is per-pod. If you need to target a specific user ID,
+  plan tier, or cohort, Darlane cannot do that. Use [Unleash](https://github.com/Unleash/unleash)
+  (self-hosted) or [Flagsmith](https://github.com/Flagsmith/flagsmith) (self-hosted).
+- **Statistical experiment analysis** — Darlane routes traffic; it does not track
+  conversion, significance, or variant attribution. Use [GrowthBook](https://github.com/growthbookio/growthbook)
+  (open source) for that layer.
+- **Real-time toggle** — SDK flag flips are instant. A Darlane `trafficWeight` change
+  requires a Crossplane reconcile (~30 s).
+- **Cookie-less stickiness** — `stickySession` only works for browser clients that
+  forward cookies. API clients, mobile SDKs, and service-to-service calls remain
+  per-request regardless.
+- **Scale** — Darlane is a single pod with no autoscaler. It is not designed to carry
+  a large percentage of production traffic long-term.
+
+Use Darlane for the **developer inner loop**: pre-PR validation, QA opt-in, short-lived
+canaries measured in hours. When a flag needs to run at production scale with user-segment
+targeting and statistical rigour, reach for a dedicated SDK. The two are complementary —
+they solve different parts of the problem.
+
 ---
 
 ## Combined workflow patterns
 
-The manifest (XR parameters) and the developer tool layer (mirrord, mutagen) are
+The manifest (XR parameters) and the developer tool layer (mirrord, wxops darlane sync) are
 independent — each works on its own, but they compose into four patterns that cover
 the majority of developer and SRE workflows.
 
@@ -471,13 +615,15 @@ the majority of developer and SRE workflows.
 XR manifest (always active, Crossplane-reconciled):
   darlane.env           → env vars the darlane pod carries
   darlane.trafficWeight → % of real Ingress traffic routed to darlane pod
-  darlane.stickySession → users pinned to one backend per session
+  darlane.stickySession → browser sessions pinned to one backend via cookie
+  darlane.headerRouting → explicit caller opt-in via request header (bypasses weight)
   darlane.fileSync      → writable emptyDir volume for code sync
 
 Developer tool layer (session-bound, active while developer is present):
-  mirrord mirror  → copies traffic to local process (read-only, prod unaffected)
-  mirrord steal   → intercepts darlane's traffic share, routes to local process
-  mutagen         → continuously syncs local code into darlane pod filesystem
+  mirrord exec --target ...           → mirror mode (default) — read-only copy of traffic, prod unaffected
+  mirrord exec --target ... --steal   → steal mode — intercepts darlane's traffic share to local process
+  mirrord exec --target ... --steal --filter "Header: value"  → scoped steal, narrows to matching requests
+  wxops darlane sync <service>        → watch local files and stream changes into the darlane pod
 ```
 
 The XR is always active. The tool layer is optional and session-scoped.
@@ -644,17 +790,17 @@ opening a PR.
 
 ---
 
-### Pattern D — Code sync to pod (mutagen + fileSync, in-cluster)
+### Pattern D — Code sync to pod (wxops darlane sync + fileSync, in-cluster)
 
-Code runs inside the darlane pod (not locally). mutagen continuously syncs your local
-`./src` into the pod's `/app`. The pod hot-reloads on each change. Combine with
-`trafficWeight` to serve real users from the pod.
+Code runs inside the darlane pod (not locally). `wxops darlane sync` continuously
+syncs your local `./src` into the pod's `/app`. The pod hot-reloads on each change.
+Combine with `trafficWeight` to serve real users from the pod.
 
 **Data flow:**
 ```
 Local ./src
     │
-mutagen sync (~1s per file change)
+wxops darlane sync payment-api --local ./src (~100 ms debounce)
     │
     ▼
 darlane pod /app      ← your code runs here, inside the cluster
@@ -694,16 +840,13 @@ POD=$(kubectl -n team-alpha get pods \
   -l app.kubernetes.io/name=payment-api,app.kubernetes.io/component=darlane \
   -o jsonpath='{.items[0].metadata.name}')
 
-# Start continuous sync — local ./src → pod /app
-mutagen sync create --name payment-api-darlane \
-  ./src \
-  k8s://team-alpha/${POD}:/app
+# Watch local ./src and stream changes into the pod's /app
+wxops darlane sync payment-api --local ./src --remote /app
 
 # Watch logs — hot-reload fires automatically on every file save
 kubectl -n team-alpha logs -f deployment/payment-api-darlane
 
-# When done
-mutagen sync terminate payment-api-darlane
+# Ctrl+C to stop sync, then scale down
 kubectl patch xtenantapp payment-api --type=merge \
   -p '{"spec":{"parameters":{"darlane":{"replicas":0}}}}'
 ```
@@ -722,8 +865,8 @@ users while maintaining a persistent in-cluster process.
 | A/B test with code still on local machine, instant iteration | **B** | `trafficWeight` + mirrord `--steal` |
 | Debug by observing real traffic, prod completely untouched | **C** | mirrord mirror |
 | Hotfix: observe first, then route % to validated fix | **C** then **A** | mirrord mirror → `trafficWeight` |
-| AI agent injects and tests code changes | **D** | `fileSync` + mutagen / `kubectl cp` |
-| Canary: real users, code iterates in pod | **D** | `fileSync` + mutagen + `trafficWeight` |
+| AI agent injects and tests code changes | **D** | `fileSync` + `wxops darlane sync` |
+| Canary: real users, code iterates in pod | **D** | `fileSync` + `wxops darlane sync` + `trafficWeight` |
 
 **The composition rule:** `trafficWeight` routes Ingress traffic to the darlane pod.
 mirrord `--steal` moves that traffic from the darlane pod to your local process.
@@ -977,7 +1120,7 @@ darlane:
 **Staged validation loop:**
 
 ```
-1. Sync fix into darlane pod via mutagen or kubectl cp
+1. Sync fix into darlane pod: `wxops darlane sync <service> --local ./src`
 2. Mirror real production traffic to local process (read-only):
      mirrord exec --target deployment/payment-api-darlane -- uvicorn main:app --reload
 3. Observe darlane logs + traces — confirm error rate drops with the fix applied
@@ -1053,7 +1196,7 @@ secrets, real database, real network — without any environment setup.
 
 ```
 AI Agent generates code change
-  → syncs to darlane pod (via kubectl cp or mutagen)
+  → syncs to darlane pod (`wxops darlane sync <service> --local ./src`)
   → darlane hot-reloads
   → agent reads pod logs / calls health endpoint
   → validates correctness against real infrastructure
@@ -1451,7 +1594,6 @@ the option to use standalone claims; no forced migration.
 - **For mirrord:** `mirrord` CLI installed locally (open-source, no operator required).
 - **For telepresence:** Traffic Manager installed in-cluster
   (`telepresence helm install`), `telepresence` CLI installed locally.
-- **For file sync:** `mutagen` CLI installed locally, or VS Code Remote -
-  Kubernetes extension.
+- **For file sync:** `wxops` CLI installed locally — `wxops darlane sync <service> [flags]`.
 - **For A/B / traffic weight:** Traefik with `TraefikService` CRD available
   (default in W'xOps clusters).

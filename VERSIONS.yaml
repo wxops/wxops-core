@@ -65,7 +65,7 @@ packages:
 
   tenant-app:
     package:
-      current: v0.2.0
+      current: v0.2.1
     api:
       served: [v1alpha1]
       storage: v1alpha1

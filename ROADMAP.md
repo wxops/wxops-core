@@ -10,6 +10,7 @@ Status: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-]` decided not to
     - [v0.2.2 / v0.2.4 — XTenantDatabase dynamic tier resolution](#v022--v024--xtenantdatabase-dynamic-tier-resolution)
     - [v0.2.7 — Gitea XRD additions](#v027--gitea-xrd-additions)
     - [v0.3.0 — Darlane + IngressRoute + KCL readiness fix](#v030--darlane--ingressroute--kcl-readiness-fix)
+    - [v0.3.1 — Darlane header routing](#v031--darlane-header-routing)
   - [Active / Planned](#active--planned)
     - [Composition Lifecycle \& Breaking Change Safety](#composition-lifecycle--breaking-change-safety)
     - [Darlane — shipped in v0.3.0](#darlane--shipped-in-v030)
@@ -73,6 +74,12 @@ Status: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-]` decided not to
 
 - [x] `platform-database-clusters`: `_isReady` / `krm.kcl.dev/ready: "True"` applied to all composed `Object` resources — fixes Crossplane v2.3 + function-kcl v0.12.1 `type: Ready` always-False bug
 - [x] `tenant-database`: same fix applied to all composed `Object` resources
+
+### v0.3.1 — Darlane header routing
+
+- [x] `darlane.headerRouting` — caller-controlled header pinning: a higher-priority `IngressRoute` rule routes requests carrying the configured header directly to darlane, bypassing `trafficWeight` and cookie assignment entirely
+- [x] Composes freely with `trafficWeight` and `stickySession` — use `trafficWeight: 0` for pure explicit opt-in with no random traffic spill, or combine with a weighted canary for a developer/QA escape hatch alongside live A/B traffic
+- [x] Darlane `ClusterIP` Service emitted whenever header routing is active, independent of `trafficWeight`
 
 ---
 
@@ -161,7 +168,7 @@ the vision and architecture.
 
 - [x] Tier 1: resources, securityContext, env overlay, args, fileSync
 - [x] Tier 2: productionOverride, ttl, rbac, serviceAccount, Kyverno TTL enforcement
-- [x] Traffic: trafficWeight, stickySession, telemetryPort, TraefikService A/B split
+- [x] Traffic: trafficWeight, stickySession, headerRouting, telemetryPort, TraefikService A/B split
 - [x] Volumes: PVC, ConfigMap, Secret with key-to-path projections
 - [x] Docs: comprehensive guide at [docs/darlane.md](docs/darlane.md)
 

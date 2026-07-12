@@ -66,10 +66,10 @@ lint: ## YAML lint + kubeconform schema validation
 render: ## Render example XRs against compositions (offline dry-run)
 	@for pkg in $(PACKAGES); do \
 		echo "→ rendering examples/$$pkg/xr.yaml"; \
-		crossplane beta render \
+		crossplane composition render \
 			examples/$$pkg/xr.yaml \
 			package/$$pkg/composition.yaml \
-			--function-runner=local \
+			providers/function-kcl.yaml \
 			2>/dev/null || true; \
 	done
 
