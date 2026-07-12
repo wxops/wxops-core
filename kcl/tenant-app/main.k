@@ -483,6 +483,10 @@ _darlaneStickyEnabled = _get(_darlaneSticky, "enabled", False)
 _darlaneStickyCookieName = _get(_darlaneSticky, "cookieName", "darlane-ab")
 _darlaneStickySecure = _get(_darlaneSticky, "secure", True)
 _darlaneStickySameSite = _get(_darlaneSticky, "sameSite", "lax")
+_darlaneHeaderRouting = _get(_darlane, "headerRouting", {})
+_darlaneHeaderRoutingEnabled = _get(_darlaneHeaderRouting, "enabled", False)
+_darlaneHeaderName = _get(_darlaneHeaderRouting, "header", "")
+_darlaneHeaderValue = _get(_darlaneHeaderRouting, "value", "")
 _darlaneContainerPort = _get(_darlane, "containerPort", containerPort)
 _darlaneSa = _get(_darlane, "serviceAccount", {})
 _darlaneSaCreate = _get(_darlaneSa, "create", False)
@@ -746,7 +750,11 @@ _certificateEnabled = ingressEnabled and _get(_ingTls, "enabled", False) and _cl
 # When active, the standard Kubernetes Ingress is replaced with a Traefik IngressRoute —
 # Kubernetes Ingress only supports Service backends; IngressRoute natively understands
 # TraefikService backends for weighted routing. When weight returns to 0, switches back.
-_darlaneTrafficEnabled = darlaneEnabled and _darlaneTrafficWeight > 0 and ingressEnabled
+# _darlaneSvcNeeded: emit the darlane ClusterIP Service whenever traffic can reach it —
+# either via weighted split or via header routing (which bypasses the TraefikService entirely).
+_darlaneHeaderRoutingActive = darlaneEnabled and ingressEnabled and _darlaneHeaderRoutingEnabled and _darlaneHeaderName != "" and _darlaneHeaderValue != ""
+_darlaneWeightedEnabled = darlaneEnabled and _darlaneTrafficWeight > 0 and ingressEnabled
+_darlaneSvcNeeded = _darlaneWeightedEnabled or _darlaneHeaderRoutingActive
 
 # host is required when ingress is enabled — an empty host on an Ingress
 # rule is a catch-all (matches any incoming Host header), which is never
@@ -775,7 +783,7 @@ _ingressroute_middlewares = ([
 
 _ingressroute_services = [
     {"name" = appName + "-weighted", "kind" = "TraefikService"}
-] if _darlaneTrafficEnabled else [
+] if _darlaneWeightedEnabled else [
     {"name" = appName, "port" = servicePort}
 ]
 
@@ -784,6 +792,18 @@ _ingressroute_route = {
     kind = "Rule"
     services = _ingressroute_services
 } | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
+
+# Header routing: a separate route with a more specific match that pins to the darlane
+# Service directly — bypasses the TraefikService weight entirely. Traefik automatically
+# assigns higher priority to rules with more matchers, so this wins over the catch-all
+# route above without needing an explicit priority field.
+_ingressroute_header_route = {
+    match = "Host(`{}`) && PathPrefix(`{}`) && Headers(`{}`, `{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"), _darlaneHeaderName, _darlaneHeaderValue)
+    kind = "Rule"
+    services = [{"name" = appName + "-darlane", "port" = servicePort}]
+} | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
+
+_ingressroute_routes = ([_ingressroute_header_route] if _darlaneHeaderRoutingActive else []) + [_ingressroute_route]
 
 _certificate = {
     apiVersion = "kubernetes.crossplane.io/v1alpha2"
@@ -842,7 +862,7 @@ _ingress_object = {
                 }
                 spec = {
                     entryPoints = ["websecure"] if _get(_ingTls, "enabled", False) else ["web"]
-                    routes = [_ingressroute_route]
+                    routes = _ingressroute_routes
                 } | ({"tls" = {"secretName" = _get(_ingTls, "secretName", appName + "-tls")}} if _get(_ingTls, "enabled", False) else {})
             }
         }
@@ -940,7 +960,7 @@ items = [_dxr, _deployment] \
     + ([_darlane_telemetry_service] if darlaneEnabled and _darlaneTelemetryPort > 0 else []) \
     + ([_serviceAccount] if _saCreate else []) \
     + ([_service] if serviceEnabled else []) \
-    + ([_darlane_service] if _darlaneTrafficEnabled else []) \
-    + ([_darlane_traefik_service] if _darlaneTrafficEnabled else []) \
+    + ([_darlane_service] if _darlaneSvcNeeded else []) \
+    + ([_darlane_traefik_service] if _darlaneWeightedEnabled else []) \
     + ([_certificate] if _certificateEnabled else []) \
     + ([_ingress_object] if ingressEnabled else [])

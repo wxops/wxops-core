@@ -143,8 +143,7 @@ spec:
     #   #   initFromImage: true    # default — initContainer pre-populates from image; sync tools push deltas
     #   #   # Developer side:
     #   #   #   POD=$(kubectl -n <ns> get pods -l app.kubernetes.io/component=darlane -o jsonpath='{.items[0].metadata.name}')
-    #   #   #   mutagen sync create --name <appName>-darlane ./src k8s://<ns>/${POD}:/app
-    #   #   #   kubectl cp ./src/. <ns>/<pod>:/app   # one-shot alternative
+    #   #   #   wxops darlane sync <appName> --local ./src --remote /app
     #
     #   # mirrord (CLI only — no manifest config needed):
     #   #   mirrord exec --target deployment/<appName>-darlane -- <command>
@@ -152,14 +151,24 @@ spec:
     #   #   mirrord exec --target deployment/<appName>-darlane --steal --filter "x-debug-user: alice" -- <command>
     #
     #   # Traffic routing: A/B testing + feature flags + full canary
-    #   # trafficWeight: 20              # 20% of real Ingress traffic → Darlane pod
+    #   # Three independent controls — compose freely.
+    #   # See docs/darlane.md#combining-traffic-modes for the full interaction table.
+    #   #
+    #   # trafficWeight: 20              # % of real Ingress traffic → Darlane pod
     #   #                               # 0=debug only | 1-99=A/B split | 100=full canary
-    #   #                               # requires ingress.enabled: true + Traefik TraefikService CRD
-    #   # stickySession:
-    #   #   enabled: true               # pin each user to the same backend for the session
+    #   #                               # requires ingress.enabled: true
+    #   #
+    #   # stickySession:                # pin browser sessions to one backend via cookie
+    #   #   enabled: true               # requires trafficWeight > 0
     #   #   cookieName: darlane-ab      # override if multiple apps share the same domain
     #   #   secure: true                # Secure flag (HTTPS only)
     #   #   sameSite: lax               # lax | strict | none
+    #   #
+    #   # headerRouting:                # pin requests by header — bypasses trafficWeight
+    #   #   enabled: true               # and cookie assignment; works with trafficWeight: 0
+    #   #   header: X-Target-Env        # HTTP header name (case-sensitive)
+    #   #   value: darlane              # header value to match (case-sensitive)
+    #   #   # e.g.: curl -H "X-Target-Env: darlane" https://payment-api.example.com/
     #
     #   # Tier 3: telemetry port + volumes
     #   # telemetryPort: 4318           # emits payment-api-darlane-telemetry ClusterIP Service

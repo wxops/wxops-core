@@ -635,6 +635,36 @@ spec:
                                 lax   — safe default; works for top-level navigations
                                 strict — strictest; may break OAuth redirect flows
                                 none  — cross-site; requires secure: true
+                        headerRouting:
+                          type: object
+                          default: {}
+                          description: |
+                            Pin requests to the Darlane pod using a request
+                            header — independent of trafficWeight. Any request
+                            that carries the configured header name/value is
+                            routed directly to the Darlane Service, bypassing
+                            the weighted TraefikService entirely. All other
+                            requests follow the normal split (or go straight
+                            to the main app when trafficWeight is 0).
+                            Works with or without trafficWeight — use
+                            trafficWeight: 0 for pure explicit opt-in with
+                            no random traffic spill at all.
+                            Requires ingress.enabled: true and darlane.enabled: true.
+                          properties:
+                            enabled:
+                              type: boolean
+                              default: false
+                            header:
+                              type: string
+                              description: |
+                                HTTP header name to match (e.g. "X-Target-Env").
+                                Case-sensitive. Required when enabled: true.
+                            value:
+                              type: string
+                              description: |
+                                Header value that pins the request to the Darlane
+                                pod (e.g. "darlane"). Case-sensitive. Required
+                                when enabled: true.
                         telemetryPort:
                           type: integer
                           minimum: 1
