@@ -15,6 +15,18 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.3.1] — 2026-07-12
+
+### Chores
+
+- Support header routing for enhance devEx ([`0367dc1`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/0367dc1de4a9547b64d01de217720633faffaf43))
+- Update readme for latest version ([`c48d451`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/c48d45114786f78134e4147870b96b912b6f7e6a))
+- Update git-cliff for clean output when bump release version ([`a07697a`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/a07697a634cc47fd2329cd295feb34a900553506))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.1/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.1/VERSIONS.yaml)
+🔍 [Diff vs 0.3.0](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.0...v0.3.1)
 ## [0.3.0] — 2026-07-10
 
 ### Features
@@ -171,6 +183,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.3.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.1
 [0.3.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.0
 [0.2.7]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.7
 [0.2.6]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.6
@@ -182,5 +195,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.0...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.1...HEAD
 
