@@ -13,7 +13,7 @@ Control-plane "brain" of W'xOps. Exposes Gitea management, PostgreSQL database p
 | [`gitea-repository`](package/gitea-repository/) | `XGiteaRepository` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.0` |
 | [`platform-database-clusters`](package/platform-database-clusters/) | `XPlatformDatabaseCluster` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.4` |
 | [`tenant-database`](package/tenant-database/) | `XTenantDatabase` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.4` |
-| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.2.1` |
+| [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.2.2` |
 <!-- packages-table-end -->
 
 > `random-password` lives in `package/random-password/` as a utility composition but is not yet published as a standalone OCI package.

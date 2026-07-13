@@ -793,13 +793,13 @@ _ingressroute_route = {
     services = _ingressroute_services
 } | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
 
-# Header routing: a separate route with a more specific match that pins to the darlane
-# Service directly — bypasses the TraefikService weight entirely. Traefik automatically
-# assigns higher priority to rules with more matchers, so this wins over the catch-all
-# route above without needing an explicit priority field.
+# Header routing: a separate route with an explicit priority that guarantees it wins over the
+# catch-all base route. Traefik's default length-based priority is not reliable when both
+# routes share the same IngressRoute — an explicit value is required.
 _ingressroute_header_route = {
     match = "Host(`{}`) && PathPrefix(`{}`) && Headers(`{}`, `{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"), _darlaneHeaderName, _darlaneHeaderValue)
     kind = "Rule"
+    priority = 100
     services = [{"name" = appName + "-darlane", "port" = servicePort}]
 } | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
 
