@@ -483,14 +483,26 @@ evaluated in **descending order** — longer rule wins. Setting `priority: 0` (o
 the field) tells Traefik to use the length calculation; any non-zero explicit value
 overrides it entirely.
 
-The composition emits two `IngressRoute` rules. In theory, the header rule's greater
-length should win automatically — but in practice, Traefik's length-based calculation
-is unreliable when both rules share the same `IngressRoute` object. The header route is
-given an explicit `priority: 100` to guarantee it always wins.
+The composition emits **two separate `IngressRoute` objects** — not two rules inside
+one object. This distinction matters: Traefik's same-object priority handling is
+unreliable when routes mix `TraefikService` and plain `Service` backends. By using
+separate objects, Traefik evaluates both routes through its global router table where
+priority ordering is guaranteed:
 
-Why 100 is safe: the base route's auto-calculated priority equals the length of its
-rule string. For a typical hostname such as `payment-api.example.com` and path `/`, the
-calculation is:
+```
+IngressRoute: payment-api          (base route — always emitted)
+  Rule: Host(`payment-api.example.com`) && PathPrefix(`/`)
+        → payment-api-weighted (TraefikService) or payment-api (main app)
+
+IngressRoute: payment-api-darlane  (header route — emitted only when headerRouting active)
+  Rule: Host(`payment-api.example.com`) && PathPrefix(`/`) && Headers(`X-Target-Env`, `darlane`)
+        priority: 100
+        → payment-api-darlane (ClusterIP Service)
+```
+
+Why `priority: 100` on the header route: Traefik's default auto-priority for the base
+route equals its rule length. For a typical hostname such as `payment-api.example.com`
+and path `/`:
 
 ```
 Host(`payment-api.example.com`) && PathPrefix(`/`)
@@ -498,19 +510,15 @@ Host(`payment-api.example.com`) && PathPrefix(`/`)
  = 50 characters  →  auto-priority 50
 ```
 
-The header route's explicit `priority: 100` is double that. A hostname would need to
+`priority: 100` on the header IngressRoute is double the base route's auto-priority,
+ensuring it always wins in Traefik's global router table. A hostname would need to
 exceed 70 characters before the base route's auto-priority could approach 100 — well
-beyond any realistic single DNS label (63-char limit per RFC 1035):
+beyond any realistic single DNS label (63-char limit per RFC 1035).
 
-```
-# explicit priority: 100 — wins unconditionally
-Host(`payment-api.example.com`) && PathPrefix(`/`) && Headers(`X-Target-Env`, `darlane`)
-  → payment-api-darlane
-
-# auto-priority: ~50 (rule length) — always lower than 100
-Host(`payment-api.example.com`) && PathPrefix(`/`)
-  → payment-api-weighted (TraefikService) or payment-api (main app)
-```
+> **Further reading:** [Traefik Weighted Round Robin](https://oneuptime.com/blog/post/2026-02-09-traefik-weighted-round-robin/view)
+> covers the weighted round robin pattern and how priority fields across separate
+> IngressRoute resources control route matching order — the same mechanism Darlane
+> uses to guarantee the header route wins over the weighted split.
 
 ### Combining traffic modes
 

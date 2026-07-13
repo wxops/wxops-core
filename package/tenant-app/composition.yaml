@@ -826,7 +826,7 @@ spec:
                 services = [{"name" = appName + "-darlane", "port" = servicePort}]
             } | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
 
-            _ingressroute_routes = ([_ingressroute_header_route] if _darlaneHeaderRoutingActive else []) + [_ingressroute_route]
+            _ingressroute_routes = [_ingressroute_route]
 
             _certificate = {
                 apiVersion = "kubernetes.crossplane.io/v1alpha2"
@@ -886,6 +886,40 @@ spec:
                             spec = {
                                 entryPoints = ["websecure"] if _get(_ingTls, "enabled", False) else ["web"]
                                 routes = _ingressroute_routes
+                            } | ({"tls" = {"secretName" = _get(_ingTls, "secretName", appName + "-tls")}} if _get(_ingTls, "enabled", False) else {})
+                        }
+                    }
+                }
+            }
+
+            # Header routing IngressRoute — separate object so Traefik evaluates the header rule
+            # independently via its global router table. Same-IngressRoute priority handling is
+            # unreliable when routes mix TraefikService and plain Service backends; separate
+            # objects remove that ambiguity entirely.
+            _ingress_header_object = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-darlane-ingressroute"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-darlane-ingressroute"
+                    } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-ingressroute") else {})
+                }
+                spec = {
+                    providerConfigRef = {name = "default"}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "traefik.io/v1alpha1"
+                            kind = "IngressRoute"
+                            metadata = {
+                                name = appName + "-darlane"
+                                namespace = ns
+                                labels = labels
+                                annotations = _commonAnnotations | _get(_ing, "annotations", {})
+                            }
+                            spec = {
+                                entryPoints = ["websecure"] if _get(_ingTls, "enabled", False) else ["web"]
+                                routes = [_ingressroute_header_route]
                             } | ({"tls" = {"secretName" = _get(_ingTls, "secretName", appName + "-tls")}} if _get(_ingTls, "enabled", False) else {})
                         }
                     }
@@ -986,4 +1020,5 @@ spec:
                 + ([_darlane_service] if _darlaneSvcNeeded else []) \
                 + ([_darlane_traefik_service] if _darlaneWeightedEnabled else []) \
                 + ([_certificate] if _certificateEnabled else []) \
-                + ([_ingress_object] if ingressEnabled else [])
+                + ([_ingress_object] if ingressEnabled else []) \
+                + ([_ingress_header_object] if _darlaneHeaderRoutingActive else [])
