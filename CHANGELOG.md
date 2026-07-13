@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.3.2] — 2026-07-13
+
+### Bug Fixes
+
+- Add the priority to header routing worked ([`a159e13`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/a159e13a91df82b5aec725b600d7075dcf04363e))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.2/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.2/VERSIONS.yaml)
+🔍 [Diff vs 0.3.1](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.1...v0.3.2)
 ## [0.3.1] — 2026-07-12
 
 ### Chores
@@ -183,6 +193,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.3.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.2
 [0.3.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.1
 [0.3.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.0
 [0.2.7]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.7
@@ -195,5 +206,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.1...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.2...HEAD
 
