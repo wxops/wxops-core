@@ -440,85 +440,52 @@ targeting instead.
 
 ### Header routing
 
-Sticky sessions solve session coherence for browser clients that forward cookies. For
-developer or QA opt-in — or for API clients and CLI tools that never send cookies —
-`headerRouting` gives you explicit, caller-controlled pinning without any session state.
-
-Any request that carries the configured header is routed directly to the darlane pod,
-bypassing the `TraefikService` weighted split entirely. All other requests continue to
-follow `trafficWeight` as normal.
+Send a specific HTTP header and every request goes directly to the darlane pod —
+no cookie, no session state, no random traffic spill. Works with `trafficWeight: 0`
+(zero production impact) or alongside a weighted canary.
 
 ```yaml
 darlane:
   enabled: true
-  trafficWeight: 0          # header routing works with or without a traffic weight
+  trafficWeight: 0   # 0 = no random traffic; combine with any weight 1–99 if needed
   headerRouting:
     enabled: true
-    header: X-Target-Env   # header name — case-sensitive
-    value: darlane         # value to match — case-sensitive
+    header: X-Target-Env   # case-sensitive
+    value: darlane         # case-sensitive
 ```
 
 ```bash
-# QA engineer — opt in from curl, no cookie, no session assignment
 curl -H "X-Target-Env: darlane" https://payment-api.example.com/api/checkout
-
-# Browser developer extension injects the header for that developer's session
-# — everyone else still hits the main app, unaffected
 ```
 
-This is not stickiness. There is no cookie, no session assignment, no state. Each
-request with the header is independently pinned; each request without the header
-follows `trafficWeight`. The caller is entirely in control.
+The darlane `ClusterIP` Service is always emitted when header routing is active,
+independent of `trafficWeight`.
 
-The darlane `ClusterIP` Service is emitted whenever header routing is active, even
-when `trafficWeight: 0` — you do not need to set a traffic weight to enable header
-routing. The Traefik `TraefikService` (weighted split) is only emitted when
-`trafficWeight > 0`.
+**How the routing is implemented:**
 
-**How Traefik prioritises the routes:**
+The composition emits **two separate `IngressRoute` objects** with fully explicit
+priorities. Same-IngressRoute priority handling is unreliable in Traefik when routes
+mix `TraefikService` and plain `Service` backends — separate objects with explicit
+integers avoid that entirely:
+
+```
+IngressRoute: payment-api          priority: 1   (fallback — no header)
+  Host(`…`) && PathPrefix(`/`)
+  → TraefikService weighted split or main app
+
+IngressRoute: payment-api-darlane  priority: 100 (wins when header present)
+  Host(`…`) && PathPrefix(`/`) && Header(`X-Target-Env`, `darlane`)
+  → payment-api-darlane Service
+```
+
+Traefik v3 uses `Header()` (singular) — not `Headers()`. Using `Headers()` produces
+an `unsupported function` parse error and drops the route silently.
 
 Per the [Traefik priority documentation](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#priority-calculation),
-default priority equals the **character length of the rule string**, and routes are
-evaluated in **descending order** — longer rule wins. Setting `priority: 0` (or omitting
-the field) tells Traefik to use the length calculation; any non-zero explicit value
-overrides it entirely.
-
-The composition emits **two separate `IngressRoute` objects** — not two rules inside
-one object. This distinction matters: Traefik's same-object priority handling is
-unreliable when routes mix `TraefikService` and plain `Service` backends. By using
-separate objects, Traefik evaluates both routes through its global router table where
-priority ordering is guaranteed:
-
-```
-IngressRoute: payment-api          (base route — always emitted)
-  Rule: Host(`payment-api.example.com`) && PathPrefix(`/`)
-        → payment-api-weighted (TraefikService) or payment-api (main app)
-
-IngressRoute: payment-api-darlane  (header route — emitted only when headerRouting active)
-  Rule: Host(`payment-api.example.com`) && PathPrefix(`/`) && Headers(`X-Target-Env`, `darlane`)
-        priority: 100
-        → payment-api-darlane (ClusterIP Service)
-```
-
-Why `priority: 100` on the header route: Traefik's default auto-priority for the base
-route equals its rule length. For a typical hostname such as `payment-api.example.com`
-and path `/`:
-
-```
-Host(`payment-api.example.com`) && PathPrefix(`/`)
-└─ "Host(`" (6) + hostname (23) + "`)" (2) + " && PathPrefix(`" (16) + "/" (1) + "`)" (2)
- = 50 characters  →  auto-priority 50
-```
-
-`priority: 100` on the header IngressRoute is double the base route's auto-priority,
-ensuring it always wins in Traefik's global router table. A hostname would need to
-exceed 70 characters before the base route's auto-priority could approach 100 — well
-beyond any realistic single DNS label (63-char limit per RFC 1035).
-
-> **Further reading:** [Traefik Weighted Round Robin](https://oneuptime.com/blog/post/2026-02-09-traefik-weighted-round-robin/view)
-> covers the weighted round robin pattern and how priority fields across separate
-> IngressRoute resources control route matching order — the same mechanism Darlane
-> uses to guarantee the header route wins over the weighted split.
+default priority equals rule string length, evaluated descending. `100 > 1` is a plain
+integer comparison — no length calculation, no ambiguity. See also:
+[Traefik Weighted Round Robin](https://oneuptime.com/blog/post/2026-02-09-traefik-weighted-round-robin/view)
+for how separate IngressRoute priorities interact with weighted splits.
 
 ### Combining traffic modes
 
