@@ -477,16 +477,37 @@ routing. The Traefik `TraefikService` (weighted split) is only emitted when
 
 **How Traefik prioritises the routes:**
 
-The composition emits two `IngressRoute` rules. Traefik assigns higher priority
-automatically to the rule with more matchers — `Host + PathPrefix + Headers` beats
-`Host + PathPrefix` — so no explicit `priority` field is needed:
+Per the [Traefik priority documentation](https://doc.traefik.io/traefik/reference/routing-configuration/http/routing/rules-and-priority/#priority-calculation),
+default priority equals the **character length of the rule string**, and routes are
+evaluated in **descending order** — longer rule wins. Setting `priority: 0` (or omitting
+the field) tells Traefik to use the length calculation; any non-zero explicit value
+overrides it entirely.
+
+The composition emits two `IngressRoute` rules. In theory, the header rule's greater
+length should win automatically — but in practice, Traefik's length-based calculation
+is unreliable when both rules share the same `IngressRoute` object. The header route is
+given an explicit `priority: 100` to guarantee it always wins.
+
+Why 100 is safe: the base route's auto-calculated priority equals the length of its
+rule string. For a typical hostname such as `payment-api.example.com` and path `/`, the
+calculation is:
 
 ```
-# Wins — header match, direct to darlane ClusterIP Service
+Host(`payment-api.example.com`) && PathPrefix(`/`)
+└─ "Host(`" (6) + hostname (23) + "`)" (2) + " && PathPrefix(`" (16) + "/" (1) + "`)" (2)
+ = 50 characters  →  auto-priority 50
+```
+
+The header route's explicit `priority: 100` is double that. A hostname would need to
+exceed 70 characters before the base route's auto-priority could approach 100 — well
+beyond any realistic single DNS label (63-char limit per RFC 1035):
+
+```
+# explicit priority: 100 — wins unconditionally
 Host(`payment-api.example.com`) && PathPrefix(`/`) && Headers(`X-Target-Env`, `darlane`)
   → payment-api-darlane
 
-# Falls through — catch-all, weighted split or main app
+# auto-priority: ~50 (rule length) — always lower than 100
 Host(`payment-api.example.com`) && PathPrefix(`/`)
   → payment-api-weighted (TraefikService) or payment-api (main app)
 ```
