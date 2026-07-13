@@ -790,6 +790,7 @@ _ingressroute_services = [
 _ingressroute_route = {
     match = "Host(`{}`) && PathPrefix(`{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"))
     kind = "Rule"
+    priority = 1
     services = _ingressroute_services
 } | ({"middlewares" = _ingressroute_middlewares} if len(_ingressroute_middlewares) > 0 else {})
 
@@ -797,7 +798,7 @@ _ingressroute_route = {
 # catch-all base route. Traefik's default length-based priority is not reliable when both
 # routes share the same IngressRoute — an explicit value is required.
 _ingressroute_header_route = {
-    match = "Host(`{}`) && PathPrefix(`{}`) && Headers(`{}`, `{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"), _darlaneHeaderName, _darlaneHeaderValue)
+    match = "Host(`{}`) && PathPrefix(`{}`) && Header(`{}`, `{}`)".format(_get(_ing, "host", ""), _get(_ing, "path", "/"), _darlaneHeaderName, _darlaneHeaderValue)
     kind = "Rule"
     priority = 100
     services = [{"name" = appName + "-darlane", "port" = servicePort}]
