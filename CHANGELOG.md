@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.3.3] — 2026-07-13
+
+### Bug Fixes
+
+- Create new object IngressRoute for handle separately the header routing ([`f889f07`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/f889f077982b426dfdc86e5c729a115567ddb3b3))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.3/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.3/VERSIONS.yaml)
+🔍 [Diff vs 0.3.2](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.2...v0.3.3)
 ## [0.3.2] — 2026-07-13
 
 ### Bug Fixes
@@ -193,6 +203,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.3.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.3
 [0.3.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.2
 [0.3.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.1
 [0.3.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.0
@@ -206,5 +217,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.2...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.3...HEAD
 
