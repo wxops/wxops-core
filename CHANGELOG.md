@@ -15,6 +15,16 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [0.3.4] — 2026-07-13
+
+### Bug Fixes
+
+- Correct the ingressRoute without calculate priority and syntax formating ([`a33a024`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/a33a024adda3d6c62ec6c5d23a1ef73cca61e342))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.4/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.3.4/VERSIONS.yaml)
+🔍 [Diff vs 0.3.3](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.3...v0.3.4)
 ## [0.3.3] — 2026-07-13
 
 ### Bug Fixes
@@ -203,6 +213,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.3.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.4
 [0.3.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.3
 [0.3.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.2
 [0.3.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.1
@@ -217,5 +228,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.3...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.4...HEAD
 
