@@ -26,3 +26,4 @@ changelog`).
 | [app-onboarding](app-onboarding.md) | Golden path from picking a template to a running `tenant-app` — ties together the templates catalog, `gitea-repository`, and `tenant-app`. |
 | [darlane](darlane.md) | In-cluster developer workspace — file sync, traffic mirroring (mirrord), A/B testing, SRE agent workflows, and the `XDarlane` XRD vision. |
 | [guardian](guardian.md) | Guardian Framework vision — platform-injected scanning, audit, and AI code review sidecars for Darlane sessions. Long-term architecture document. |
+| [multi-cluster](multi-cluster.md) | Hub-and-spoke multi-cluster architecture — control plane / identity / data plane layers, two adoptable reference architectures (Git-centric vs. ArgoCD hub-spoke with CAPI), and the migration path from today's single cluster. Design document. |
