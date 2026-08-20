@@ -118,6 +118,15 @@ _allClusters = _ctxExtras.allClusters or []
 _existingDbs = _ctxExtras.existingDatabases or []
 
 dbName = params.dbName
+
+# ── Target cluster ──────────────────────────────────────────────────
+# Every composed Object is applied through a provider-kubernetes
+# ProviderConfig. "default" is the local (hub) cluster, which is the only
+# one wired up today, so leaving spec.parameters.cluster unset keeps
+# behaviour identical. Naming the ProviderConfig here rather than hardcoding
+# it means adding a spoke later is a ProviderConfig + one field, not an edit
+# to every resource in this file. See docs/multi-cluster.md.
+targetCluster = _get(params, "cluster", "default")
 owner = params.owner
 tier = _get(params, "tier", "shared")
 environment = _get(params, "environment", "dev")
@@ -332,7 +341,7 @@ _pwd_gen = {
     }
     spec = {
         deletionPolicy = _objDeletionPolicy
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "generators.external-secrets.io/v1alpha1"
@@ -367,7 +376,7 @@ _conn_bundle = {
     }
     spec = {
         deletionPolicy = _objDeletionPolicy
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1"
@@ -445,7 +454,7 @@ _sql_role = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-role") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.sql.crossplane.io/v1alpha1"
@@ -496,7 +505,7 @@ _cnpg_database = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-database") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
@@ -621,7 +630,7 @@ _push_secret = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-push-secret") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
@@ -650,6 +659,35 @@ _push_secret = {
 # Other XTenantDatabase XRs read status.clusterRef (via function-extra-resources)
 # for per-cluster tenant counting and collision checks.
 _resolvedTier = "explicit" if _hasExplicitCluster else tier
+
+# created/ready mirror the XTenantApp contract so the portal has one field to
+# poll across every package. Crossplane's native type:Ready is unreliable on
+# v2.3 + function-kcl v0.12.1, so both are derived from ocds instead.
+#
+# created: every composed resource has been observed at least once.
+# ready:   the database is actually usable — it exists, its owning role exists,
+#          and the connection Secret has materialised. On tier: dedicated the
+#          child cluster must be up too, since the database lives on it.
+#
+# -pwd-gen and -push-secret are deliberately excluded from `ready`:
+#   - pwd-gen is a precondition of conn-bundle, so it is already implied.
+#   - push-secret writes the credentials to Vault. That is a platform concern;
+#     if it lags, the application can still connect. Folding it in would make
+#     `ready` false for a database that works.
+_composedNames = [
+    short + "-pwd-gen"
+    short + "-conn-bundle"
+    short + "-sql-role"
+    short + "-cnpg-database"
+    short + "-push-secret"
+] + ([short + "-dedicated-cluster"] if _isDedicated else [])
+
+_dbCreated = len([n for n in _composedNames if n not in _ocds]) == 0
+_dbReady = _isReady(short + "-cnpg-database") \
+    and _isReady(short + "-sql-role") \
+    and _isReady(short + "-conn-bundle") \
+    and (_isReady(short + "-dedicated-cluster") if _isDedicated else True)
+
 _dxr = {
     apiVersion = "platform.wxops.cloud/v1alpha1"
     kind = "XTenantDatabase"
@@ -661,6 +699,8 @@ _dxr = {
         clusterNamespace = clusterNs
         tier = _resolvedTier
         dbName = dbName
+        created = _dbCreated
+        ready = _dbReady
     }
 }
 

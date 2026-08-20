@@ -12,12 +12,22 @@
 #
 # Updated automatically by CI on tag push (package.current).
 # Updated manually when XRD spec.versions changes (api.*).
+#
+# API version decision (ROADMAP.md Phase 0 §0.5, decided): all seven XRDs stay
+# on v1alpha1 through the portal's first integration. Every Phase 0 change
+# (status parity, monitoring, targetCluster, darlane status) is purely
+# additive, so nothing forces a bump — dual-serving now would duplicate the
+# full schema per XRD (500+ lines for tenant-app alone) for no present benefit.
+# Promote to v1beta1 as part of Phase 4 (OSS release), the natural point to
+# make a stability commitment. Portal v1 pinning an alpha API is acceptable
+# while portal and core ship together. See docs/status-contract.md for the
+# current per-package status field contract the portal binds to today.
 
 packages:
 
   gitea-user:
     package:
-      current: v0.1.1
+      current: v0.1.2
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -25,7 +35,7 @@ packages:
 
   gitea-org:
     package:
-      current: v0.1.1
+      current: v0.1.2
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -33,7 +43,7 @@ packages:
 
   gitea-team:
     package:
-      current: v0.1.1
+      current: v0.1.2
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -41,7 +51,7 @@ packages:
 
   gitea-repository:
     package:
-      current: v0.1.0
+      current: v0.1.1
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -49,7 +59,7 @@ packages:
 
   platform-database-clusters:
     package:
-      current: v0.1.4
+      current: v0.1.5
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -57,7 +67,7 @@ packages:
 
   tenant-database:
     package:
-      current: v0.1.4
+      current: v0.1.5
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -65,7 +75,7 @@ packages:
 
   tenant-app:
     package:
-      current: v0.2.4
+      current: v0.2.5
     api:
       served: [v1alpha1]
       storage: v1alpha1

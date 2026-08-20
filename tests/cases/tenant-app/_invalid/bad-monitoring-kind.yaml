@@ -1,0 +1,13 @@
+# expect: is not one of ['auto', 'ServiceMonitor', 'PodMonitor']
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantApp
+metadata:
+  name: bad-mon
+spec:
+  parameters:
+    appName: payment-api
+    namespace: rocket-team-production
+    image: ghcr.io/x/y:1
+    monitoring:
+      enabled: true
+      kind: Prometheus

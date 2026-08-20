@@ -1,0 +1,84 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaRepository
+metadata:
+  name: team-alpha-api-service
+spec:
+  crossplane:
+    resourceRefs:
+      - apiVersion: tf.upbound.io/v1beta1
+        kind: Workspace
+        name: tf-workspace
+status:
+  cloneUrl: https://gitea.example.com/rocket-team/payment-api.git
+  conditions:
+    - reason: WatchCircuitClosed
+      status: 'True'
+      type: Responsive
+    - reason: ReconcileSuccess
+      status: 'True'
+      type: Synced
+    - reason: Available
+      status: 'True'
+      type: Ready
+  created: true
+  htmlUrl: https://gitea.example.com/rocket-team/payment-api
+  ready: true
+  repoId: '3'
+  sshUrl: git@gitea.example.com:rocket-team/payment-api.git
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: tf-workspace
+  labels:
+    crossplane.io/composite: team-alpha-api-service
+  name: tf-workspace
+  ownerReferences:
+    - apiVersion: platform.wxops.cloud/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XGiteaRepository
+      name: team-alpha-api-service
+      uid: c3ebe143-36f0-513d-894b-a03314d9f030
+spec:
+  forProvider:
+    module: "terraform {\n  required_providers {\n    gitea = {\n      source  = \"go-gitea/gitea\"\n      version = \"~> 0.7.0\"\n    }\n  }\n}\n\nvariable \"gitea_url\"  { type = string }\nvariable \"insecure\" {\n  type    = bool\n  default = false\n}\nvariable \"org_name\"  { type = string }\nvariable \"repo_name\" { type = string }\nvariable \"description\" {\n  type    = string\n  default = \"\"\n}\nvariable \"private\" {\n  type    = bool\n  default = false\n}\nvariable \"auto_init\" {\n  type    = bool\n  default = true\n}\nvariable \"default_branch\" {\n  type    = string\n  default = \"main\"\n}\nvariable \"has_issues\" {\n  type    = bool\n  default = true\n}\nvariable \"has_wiki\" {\n  type    = bool\n  default = false\n}\nvariable \"has_projects\" {\n  type    = bool\n  default = false\n}\nvariable \"has_pull_requests\" {\n  type    = bool\n  default = true\n}\n\nvariable \"gitea_token\" {\n  type      = string\n  sensitive = true\n}\n\nprovider \"gitea\" {\n  base_url = var.gitea_url\n\
+      \  token    = var.gitea_token\n  insecure = var.insecure\n}\n\nresource \"gitea_repository\" \"this\" {\n  username          = var.org_name\n  name              = var.repo_name\n  description       = var.description\n  private           = var.private\n  auto_init         = var.auto_init\n  default_branch    = var.default_branch\n  has_issues        = var.has_issues\n  has_wiki          = var.has_wiki\n  has_projects      = var.has_projects\n  has_pull_requests = var.has_pull_requests\n}\n\noutput \"repo_id\"    { value = gitea_repository.this.id }\noutput \"clone_url\"  { value = gitea_repository.this.clone_url }\noutput \"ssh_url\"    { value = gitea_repository.this.ssh_url }\noutput \"html_url\"   { value = gitea_repository.this.html_url }\n"
+    source: Inline
+    varFiles:
+      - secretKeyRef:
+          key: credentials
+          name: gitea-credentials
+          namespace: crossplane-system
+        source: SecretKey
+    vars:
+      - key: gitea_url
+        value: https://gitea.example.com
+      - key: org_name
+        value: team-alpha
+      - key: repo_name
+        value: api-service
+      - key: description
+        value: Alpha squad API service
+      - key: private
+        value: 'true'
+      - key: auto_init
+        value: 'true'
+      - key: default_branch
+        value: main
+      - key: has_issues
+        value: 'true'
+      - key: has_wiki
+        value: 'false'
+      - key: has_projects
+        value: 'false'
+      - key: has_pull_requests
+        value: 'true'
+      - key: insecure
+        value: 'false'
+  providerConfigRef:
+    name: default
+  writeConnectionSecretToRef:
+    name: tf-gitea-repo-c3ebe143-36f0-513d-894b-a03314d9f030
+    namespace: crossplane-system

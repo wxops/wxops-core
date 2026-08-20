@@ -981,15 +981,17 @@ documented as being for portal or CI authentication, including cloud workload
 identity bindings. That is a *workload* identity for the pod — useful, but not
 the same thing as a *developer* identity for access to the pod.
 
-There is currently **no `darlane.rbac` block** in
-`package/tenant-app/xrd.yaml` — no `Role`, no `RoleBinding`, no `subjects`. The
-`darlane` description mentions "scoped RBAC for developer access" as intent, and
-`darlane.ttl` emits a `wxops.cloud/darlane-ttl` annotation, but the authorisation
-surface itself is not implemented.
+W'xOps Core deliberately emits **no RBAC at all** — no `Role`, no `RoleBinding`,
+no `subjects` — and provider-kubernetes is not granted permission to create any.
+See ROADMAP.md "Decided and rejected" for the reasoning.
 
-That gap is worth closing **before** multi-cluster work, not after. A per-app
-`Role` + `RoleBinding` with real subjects is what Pinniped-issued identities bind
-to; without it there is nothing for federated identity to grant. It is also
+The authorisation surface still has to exist; it is just authored elsewhere. The
+composition creates the Darlane ServiceAccount and publishes its name in
+`status.darlane.serviceAccountName`, and the GitOps repo binds a `Role` to that
+name. That binding is what Pinniped-issued identities ultimately grant against.
+
+Getting that binding in place is worth doing **before** multi-cluster work, not
+after — without it there is nothing for federated identity to grant. It is also
 strictly useful single-cluster, so it is not speculative work.
 
 Minimum shape:
@@ -1366,9 +1368,15 @@ preference.
 
 Do these before any multi-cluster work. All are useful on their own.
 
-- Implement `darlane.rbac` (`Role` + `RoleBinding` + `subjects`) in
-  `package/tenant-app/xrd.yaml` and `kcl/tenant-app/main.k`. Without it there is
-  no authorisation surface for federated identity to bind to.
+- Author the Darlane `Role` + `RoleBinding` **in the GitOps repo**, bound to the
+  ServiceAccount name the composition publishes at
+  `status.darlane.serviceAccountName`. Core does not emit RBAC by design, so this
+  step lives outside this repository — but without it there is no authorisation
+  surface for federated identity to bind to.
+
+  Note `pods/exec` cannot be restricted to a single Deployment by RBAC, so a
+  Darlane shell grant is namespace-wide however it is authored. Size tenant
+  namespaces accordingly.
 - Replace the 12 hardcoded `providerConfigRef = {name = "default"}` in
   `kcl/tenant-app/main.k` with a single `targetCluster` variable, defaulting to
   `"default"`. Behaviour-neutral today; unblocks everything later. Repeat for

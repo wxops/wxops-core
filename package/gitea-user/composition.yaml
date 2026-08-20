@@ -240,3 +240,55 @@ spec:
               - type: FromCompositeFieldPath
                 fromFieldPath: spec.parameters.credentialsSecretRef.name
                 toFieldPath: spec.forProvider.varFiles[0].secretKeyRef.name
+
+              # ── Status write-back ──────────────────────────────────────────
+              # provider-terraform publishes non-sensitive outputs under
+              # status.atProvider.outputs, and only after `terraform apply` has
+              # succeeded and written state. Their presence is therefore the
+              # "finished provisioning" signal.
+              #
+              # initial_password is marked sensitive in the module, so it is
+              # routed to the connection secret and never appears here — do not
+              # add a patch for it.
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.outputs.user_id
+                toFieldPath: status.userId
+                policy:
+                  fromFieldPath: Optional
+
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.outputs.username
+                toFieldPath: status.username
+                policy:
+                  fromFieldPath: Optional
+
+              # created/ready both derive from the same signal: a user either
+              # exists or it does not, there is no rollout phase. Two fields are
+              # kept so every W'xOps package presents the same status contract.
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.outputs.user_id
+                toFieldPath: status.created
+                policy:
+                  fromFieldPath: Optional
+                transforms:
+                  - type: match
+                    match:
+                      patterns:
+                        - type: regexp
+                          regexp: ".+"
+                          result: true
+                      fallbackValue: false
+
+              - type: ToCompositeFieldPath
+                fromFieldPath: status.atProvider.outputs.user_id
+                toFieldPath: status.ready
+                policy:
+                  fromFieldPath: Optional
+                transforms:
+                  - type: match
+                    match:
+                      patterns:
+                        - type: regexp
+                          regexp: ".+"
+                          result: true
+                      fallbackValue: false

@@ -127,7 +127,8 @@ short = uid[:8:]
 # declared-but-unset on schema-typed objects from oxr.spec.parameters (it
 # returns Undefined instead). Use membership checks via this helper instead.
 _get = lambda d: any, k: str, default: any -> any {
-    d[k] if k in d else default
+    _safe = d or {}
+    _safe[k] if k in _safe else default
 }
 
 # ── ArgoCD resource tracking ─────────────────────────────────────────────────
@@ -138,6 +139,15 @@ _argoLabels = {"app.kubernetes.io/instance": _argoInstance} if _argoInstance els
 # ── Section 1: Core parameters ────────────────────────────────────────────────
 c = params.clusterName
 ns = params.namespace
+
+# ── Target cluster ──────────────────────────────────────────────────
+# Every composed Object is applied through a provider-kubernetes
+# ProviderConfig. "default" is the local (hub) cluster, which is the only
+# one wired up today, so leaving spec.parameters.cluster unset keeps
+# behaviour identical. Naming the ProviderConfig here rather than hardcoding
+# it means adding a spoke later is a ProviderConfig + one field, not an edit
+# to every resource in this file. See docs/multi-cluster.md.
+targetCluster = _get(params, "cluster", "default")
 instances = _get(params, "instances", 1)
 postgresVersion = _get(params, "postgresVersion", 16)
 storageSize = _get(params, "storageSize", "8Gi")
@@ -353,7 +363,7 @@ _cnpg_cluster = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-cluster") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
@@ -376,7 +386,7 @@ _cnpg_rw_pooler = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-rw-pooler") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
@@ -406,7 +416,7 @@ _cnpg_ro_pooler = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-cnpg-ro-pooler") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
@@ -436,7 +446,7 @@ _scheduled_backup = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-scheduled-backup") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.cnpg.io/v1"
@@ -482,7 +492,7 @@ _push_secret = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-push-secret") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
@@ -516,7 +526,7 @@ _app_push_secret = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-app-push-secret") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
@@ -566,7 +576,7 @@ _sql_creds_secret = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-creds") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1"
@@ -605,7 +615,7 @@ _sql_provider_config = {
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-sql-provider-config") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "postgresql.sql.crossplane.io/v1alpha1"
@@ -641,7 +651,7 @@ _managed_role_gens = [{
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-gen") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "generators.external-secrets.io/v1alpha1"
@@ -670,7 +680,7 @@ _managed_role_conn_bundles = [{
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-creds-bundle") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1"
@@ -717,7 +727,7 @@ _managed_role_push_secrets = [{
         } | ({"krm.kcl.dev/ready" = "True"} if _isReady(short + "-" + r.name + "-push-secret") else {})
     }
     spec = {
-        providerConfigRef = {name = "default"}
+        providerConfigRef = {name = targetCluster}
         forProvider = {
             manifest = {
                 apiVersion = "external-secrets.io/v1alpha1"
@@ -747,6 +757,40 @@ _managed_role_push_secrets = [{
 # shared pool, and status.clusterName + status.namespace for assignment.
 # NOTE: dxr updates write status but Crossplane ignores metadata.labels —
 # discovery labels (wxops.cloud/managed-by) must be in the XR manifest.
+
+# created/ready mirror the XTenantApp contract so the portal has one field to
+# poll across every package. Crossplane's native type:Ready is unreliable on
+# v2.3 + function-kcl v0.12.1, so both are derived from ocds instead.
+#
+# created: every composed resource this XR emits has been observed at least once.
+# ready:   the cluster can actually serve connections — the CNPG Cluster is up,
+#          and any pooler that was asked for is up too, since tenants are handed
+#          the pooler endpoint rather than the cluster's.
+#
+# Excluded from `ready` on purpose:
+#   - push-secrets / credential bundles: Vault seeding is a platform concern. If
+#     it lags, the cluster still serves connections.
+#   - scheduled backups: a backup schedule not yet registered does not make a
+#     running cluster unready. Its failure is an operational alert, not a
+#     readiness gate.
+_composedNames = [
+    short + "-cnpg-cluster"
+    short + "-push-secret"
+    short + "-app-push-secret"
+    short + "-sql-creds"
+    short + "-sql-provider-config"
+] + [short + "-" + r.name + "-gen" for r in managedRoles] \
+  + [short + "-" + r.name + "-creds-bundle" for r in managedRoles] \
+  + [short + "-" + r.name + "-push-secret" for r in managedRoles] \
+  + ([short + "-cnpg-rw-pooler"] if poolerEnabled else []) \
+  + ([short + "-cnpg-ro-pooler"] if roPoolerEnabled else []) \
+  + ([short + "-scheduled-backup"] if backupEnabled else [])
+
+_clusterCreated = len([n for n in _composedNames if n not in _ocds]) == 0
+_clusterReady = _isReady(short + "-cnpg-cluster") \
+    and (_isReady(short + "-cnpg-rw-pooler") if poolerEnabled else True) \
+    and (_isReady(short + "-cnpg-ro-pooler") if roPoolerEnabled else True)
+
 _dxr = {
     apiVersion = "platform.wxops.cloud/v1alpha1"
     kind = "XPlatformDatabaseCluster"
@@ -755,6 +799,8 @@ _dxr = {
         namespace = ns
         shared = shared
         environment = environment
+        created = _clusterCreated
+        ready = _clusterReady
     }
 }
 

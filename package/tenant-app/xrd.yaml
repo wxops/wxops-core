@@ -28,6 +28,16 @@ spec:
                     - namespace
                     - image
                   properties:
+                    cluster:
+                      type: string
+                      description: |
+                        Name of the provider-kubernetes ProviderConfig to apply this
+                        XR's composed resources through. Defaults to "default", the
+                        local (hub) cluster — the only one wired up today, so leaving
+                        this unset is behaviour-neutral.
+
+                        Set it to target a spoke cluster once a ProviderConfig for
+                        that spoke exists. See docs/multi-cluster.md.
                     appName:
                       type: string
                       description: |
@@ -470,6 +480,81 @@ spec:
                           default: false
 
                     # ── Darlane (in-cluster developer lane) ─────────────────
+                    monitoring:
+                      type: object
+                      default: {}
+                      description: |
+                        Prometheus scrape configuration, emitted as a real Prometheus
+                        Operator CRD (ServiceMonitor or PodMonitor).
+
+                        This replaces the prometheus.io/* pod annotations, which do
+                        nothing on this platform: those are a Prometheus convention
+                        honoured only by a kubernetes_sd_config job with matching
+                        relabel rules, and kube-prometheus-stack's
+                        additionalScrapeConfigs is empty. See docs/observability.md.
+                      properties:
+                        enabled:
+                          type: boolean
+                          default: false
+                          description: Master toggle. When false, no monitor is emitted.
+                        kind:
+                          type: string
+                          enum: [auto, ServiceMonitor, PodMonitor]
+                          default: auto
+                          description: |
+                            auto            — ServiceMonitor when service.enabled is true,
+                                              PodMonitor when it is false.
+                            ServiceMonitor  — scrapes endpoints behind the Service. Requires
+                                              service.enabled: true.
+                            PodMonitor      — scrapes pods directly by label.
+
+                            Prefer PodMonitor when per-pod visibility through a readiness
+                            failure matters: a ServiceMonitor only scrapes endpoints the
+                            Service considers Ready, so a pod failing its readiness probe
+                            drops out of the endpoint list and stops being scraped —
+                            exactly when its metrics are most useful.
+                        port:
+                          type: integer
+                          description: |
+                            Port to scrape. Defaults to containerPort when unset — no
+                            schema default, matching the darlane.telemetryPort precedent.
+                        path:
+                          type: string
+                          default: /metrics
+                          description: HTTP path exposing the metrics.
+                        interval:
+                          type: string
+                          default: 30s
+                          description: Scrape interval.
+                        scrapeTimeout:
+                          type: string
+                          default: 10s
+                          description: Per-scrape timeout. Must be <= interval.
+                        sampleLimit:
+                          type: integer
+                          default: 5000
+                          description: |
+                            Maximum samples accepted per scrape. Set by the composition
+                            rather than left to Prometheus, which runs with sampleLimit,
+                            targetLimit and labelLimit all 0 — no guardrail anywhere. One
+                            tenant emitting raw URLs as a `path` label would otherwise
+                            degrade Prometheus for every tenant on the cluster.
+                        honorLabels:
+                          type: boolean
+                          default: false
+                          description: |
+                            When true, target labels from the scraped metrics win over
+                            the labels Prometheus attaches. Leave false unless federating.
+                        metricRelabelings:
+                          type: array
+                          default: []
+                          description: |
+                            Prometheus metric_relabel_configs applied at ingest — the
+                            escape hatch for dropping a misbehaving high-cardinality
+                            series without redeploying the application.
+                          items:
+                            type: object
+                            x-kubernetes-preserve-unknown-fields: true
                     darlane:
                       type: object
                       default: {}
@@ -477,9 +562,14 @@ spec:
                         Platform-provisioned developer lane — a parallel Deployment
                         (<appName>-darlane) sharing the same secrets, database
                         connections, and env as the main app. Scaled to 0 at rest,
-                        zero external exposure by default. Supports file sync,
-                        traffic mirroring (mirrord), and scoped RBAC for developer
-                        access. See docs/darlane.md.
+                        zero external exposure by default. Supports file sync and
+                        traffic mirroring (mirrord). See docs/darlane.md.
+
+                        Developer access is NOT granted here. This composition creates
+                        the ServiceAccount and publishes its name in
+                        status.darlane.serviceAccountName; the Role and RoleBinding are
+                        authored in the GitOps repo, where RBAC gets reviewed on a diff
+                        and Crossplane needs no permission to mint it.
                       properties:
                         enabled:
                           type: boolean
@@ -1005,6 +1095,56 @@ spec:
                     report Ready. Derived from the observed composed-resource state on
                     each reconcile — accurate even when Crossplane's composite Ready
                     condition lags due to WatchCircuitOpen throttling.
+
+                    Scoped to the core workload on purpose. Check dependenciesReady
+                    alongside it before declaring the app fully healthy.
+                dependenciesReady:
+                  type: boolean
+                  description: |
+                    True when composed resources that do not gate the workload itself,
+                    but do gate the app being usable end-to-end, report Ready. Today
+                    that is the cert-manager Certificate (when ingress.tls is enabled).
+
+                    Split from `ready` so a consumer can render "app is up, TLS still
+                    issuing" rather than a blanket "not ready" for an app that is
+                    already serving.
+
+                    Note this XR does not compose an XTenantDatabase — secretsFrom.database
+                    only wires an existing Secret in by name and is never waited on — so
+                    database provisioning is not reflected here.
+                darlane:
+                  type: object
+                  description: |
+                    Observed state of the Darlane debug twin. Absent entirely when
+                    darlane.enabled is false.
+                  properties:
+                    ready:
+                      type: boolean
+                      description: True when the <appName>-darlane Deployment reports Ready.
+                    replicas:
+                      type: integer
+                      description: |
+                        Observed ready replicas, read from the Deployment manifest that
+                        provider-kubernetes writes back — not the desired count from spec.
+                    trafficMode:
+                      type: string
+                      description: |
+                        Resolved routing for the twin: none, weighted (TraefikService
+                        split), header (header-matched IngressRoute), or both.
+                    ttl:
+                      type: string
+                      description: |
+                        The configured darlane.ttl duration (e.g. "4h"), echoed as-is.
+                        Not an expiry timestamp: ttl is a duration and the composition
+                        has no clock, so combine it with the Deployment's
+                        creationTimestamp to compute one. Empty when unset.
+                    serviceAccountName:
+                      type: string
+                      description: |
+                        Name of the ServiceAccount the twin runs as, published so RBAC
+                        can be bound to it from the GitOps repo. Compositions in this
+                        repo never emit Role or RoleBinding themselves. Empty when no
+                        ServiceAccount is configured.
                 url:
                   type: string
                   description: |

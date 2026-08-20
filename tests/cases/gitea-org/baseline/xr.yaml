@@ -1,0 +1,16 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaOrg
+metadata:
+  name: team-alpha
+spec:
+  parameters:
+    giteaUrl: https://gitea.example.com
+    orgName: team-alpha
+    fullName: Team Alpha
+    description: Alpha product squad
+    visibility: private
+    # repoAdminChangeTeamAccess defaults to false.
+    # repoAdminChangeTeamAccess: false
+    credentialsSecretRef:
+      name: gitea-credentials
+      namespace: crossplane-system

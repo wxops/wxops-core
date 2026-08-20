@@ -27,6 +27,16 @@ spec:
                     - dbName
                     - owner
                   properties:
+                    cluster:
+                      type: string
+                      description: |
+                        Name of the provider-kubernetes ProviderConfig to apply this
+                        XR's composed resources through. Defaults to "default", the
+                        local (hub) cluster — the only one wired up today, so leaving
+                        this unset is behaviour-neutral.
+
+                        Set it to target a spoke cluster once a ProviderConfig for
+                        that spoke exists. See docs/multi-cluster.md.
                     tier:
                       type: string
                       default: "shared"
@@ -186,3 +196,21 @@ spec:
                 dbName:
                   type: string
                   description: PostgreSQL database name (echoed for cross-XR collision checks).
+                created:
+                  type: boolean
+                  description: |
+                    True once every composed resource has been observed at least
+                    once. Indicates provisioning has started, not that it succeeded.
+                ready:
+                  type: boolean
+                  description: |
+                    True when the database is usable: it exists, its owning role
+                    exists, and the connection Secret has materialised (plus, on
+                    tier: dedicated, the child cluster is up).
+
+                    Derived from observed composed-resource state rather than the
+                    native type:Ready condition, which is unreliable on Crossplane
+                    v2.3 with function-kcl v0.12.1. Poll this field, not conditions.
+
+                    Vault credential push (PushSecret) is deliberately excluded — if
+                    it lags, applications can still connect.

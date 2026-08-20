@@ -29,6 +29,7 @@ Secret(s) they produce.
 |---|---|---|---|---|
 | `appName` | `string` | yes | | Application name. Used as the name of the `Deployment`/`Service`/`IngressRoute` and as the value of the `app.kubernetes.io/name` and `app.kubernetes.io/instance` labels. |
 | `namespace` | `string` | yes | | Target namespace for all resources created by this XR. |
+| `cluster` | `string` | | `"default"` | Name of the provider-kubernetes `ProviderConfig` to apply composed resources through. `default` is the local (hub) cluster — the only one wired up today, so leaving this unset is behaviour-neutral. See [multi-cluster.md](multi-cluster.md). |
 | `environment` | `string` | | `"dev"` | One of `dev`, `staging`, `prod`. Applied as the `wxops.cloud/environment` label on created resources — purely metadata for dashboards, cost reports, and Kyverno generate-policies. Pairs with an ArgoCD ApplicationSet matrix generator (apps × environments). |
 | `appFlavor` | `string` | | `"webapp"` | One of `webapp`, `ai`, `ai-webapp`, `geo-webapp`, `search-webapp`. Applied as the `wxops.cloud/app-flavor` label on created resources — purely metadata for platform-level automation (e.g. a separate `XTenantDatabase` claim choosing `pgvector`/`postgis` extensions, or Kyverno generate-policies) to key off. Does not affect any resource composed by this XR. |
 | `templateId` | `string` | | | Backstage/IDP software-template identifier this app was scaffolded from. Applied as the `wxops.cloud/template-id` annotation on all composed resources — catalog-linking metadata only. |
@@ -318,6 +319,115 @@ references).
 Both `Middleware` CRDs are expected to exist in the `kube-system` namespace.
 Requires Traefik configured with `--providers.kubernetescrd.allowCrossNamespace=true`.
 `tenant-app` does not provision or manage these `Middleware` CRDs.
+
+### `monitoring`
+
+Emits a real Prometheus Operator CRD. **Do not use `prometheus.io/*` pod
+annotations** — they are a convention read only by a `kubernetes_sd_config` job
+with matching relabel rules, and kube-prometheus-stack's
+`additionalScrapeConfigs` is empty here, so they scrape nothing. Full rationale
+in [observability.md](observability.md).
+
+| Field | Type | Default | Description |
+|---|---|---|---|
+| `enabled` | `boolean` | `false` | Master toggle. No monitor is emitted when false. |
+| `kind` | `string` | `auto` | `auto` \| `ServiceMonitor` \| `PodMonitor`. `auto` resolves on `service.enabled`. |
+| `port` | `integer` | `containerPort` | Port to scrape. No schema default — falls back in KCL. |
+| `path` | `string` | `/metrics` | HTTP path exposing the metrics. |
+| `interval` | `string` | `30s` | Scrape interval. |
+| `scrapeTimeout` | `string` | `10s` | Per-scrape timeout. Must be `<=` `interval`. |
+| `sampleLimit` | `integer` | `5000` | Max samples per scrape. Prometheus runs with no global limits, so this is the only guardrail. |
+| `honorLabels` | `boolean` | `false` | Target labels win over Prometheus-attached labels. |
+| `metricRelabelings` | `array` | `[]` | `metric_relabel_configs` applied at ingest — the escape hatch for a high-cardinality series. |
+
+**ServiceMonitor vs PodMonitor.** A `ServiceMonitor` only scrapes endpoints the
+Service considers `Ready`, so a pod failing its readiness probe drops out of the
+endpoint list and **stops being scraped — exactly when its metrics matter most**.
+A `PodMonitor` keeps scraping it, and is the only option when
+`service.enabled: false`. Setting `kind: ServiceMonitor` without a Service is a
+hard error rather than a silent no-op.
+
+The emitted monitor carries `release: kube-prometheus-stack`, which the Operator
+filters on (`serviceMonitorSelectorNilUsesHelmValues: true`), and selects on
+`app.kubernetes.io/component: app` so the Darlane twin's metrics never merge into
+the app's own series.
+
+> Requires `monitoring.coreos.com` in `providers/rbac-provider-kubernetes.yaml`.
+> Without it every emitted monitor fails `forbidden` at reconcile.
+
+## Developer access and RBAC
+
+**This composition emits no RBAC.** There is no `Role`, `ClusterRole`,
+`RoleBinding`, or `ClusterRoleBinding`, and provider-kubernetes is deliberately
+not granted permission to create them.
+
+| Concern | Owner | Mechanism |
+|---|---|---|
+| Create the ServiceAccount | **core** | `darlane.serviceAccount.create: true` |
+| Publish the SA name | **core** | `status.darlane.serviceAccountName` |
+| Define `Role` / `ClusterRole` | GitOps repo | plain manifests, reviewed as RBAC |
+| Bind role → ServiceAccount | GitOps repo | `RoleBinding` / `ClusterRoleBinding` |
+
+A composition that mints RBAC turns provider-kubernetes into a
+privilege-escalation vector — Kubernetes' escalation check only blocks granting
+permissions the creator lacks, and that ServiceAccount already holds broad
+grants. RBAC also deserves human review on a diff, which it gets in a GitOps repo.
+
+Read the ServiceAccount name from the XR, then bind to it:
+
+```yaml
+# authored in the GitOps repo, not composed by this XR
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: payment-api-darlane-debug
+  namespace: rocket-team-production
+subjects:
+  - kind: User
+    name: alice@example.com          # or a Group from your IdP
+    apiGroup: rbac.authorization.k8s.io
+roleRef:
+  kind: Role
+  name: payment-api-darlane          # defined alongside this binding
+  apiGroup: rbac.authorization.k8s.io
+```
+
+> **`pods/exec` cannot be name-restricted by RBAC.** A grant that allows a shell
+> into the Darlane pod allows a shell into *every* pod in that namespace,
+> including the production Deployment. No authoring style changes this — size
+> tenant namespaces accordingly.
+
+## `status`
+
+| Field | Type | Description |
+|---|---|---|
+| `created` | `boolean` | All core resources (Deployment, Service, IngressRoute) observed at least once. |
+| `ready` | `boolean` | All core resources report Ready. **Scoped to the workload** — see below. |
+| `dependenciesReady` | `boolean` | Non-workload composed resources are Ready. Today: the cert-manager `Certificate`. |
+| `url` | `string` | Derived from `ingress.host`. Empty when ingress is disabled. |
+| `namespace` | `string` | Namespace the app is deployed to. |
+| `image` | `string` | Container image currently configured. |
+| `darlane` | `object` | Twin state. Absent entirely when `darlane.enabled` is false. |
+| `darlane.ready` | `boolean` | The `<appName>-darlane` Deployment reports Ready. |
+| `darlane.replicas` | `integer` | **Observed** ready replicas, not the desired count from spec. |
+| `darlane.trafficMode` | `string` | `none` \| `weighted` \| `header` \| `both`. |
+| `darlane.ttl` | `string` | The configured `darlane.ttl` duration, echoed as-is. |
+| `darlane.serviceAccountName` | `string` | The RBAC binding target — see above. |
+
+**Why `ready` and `dependenciesReady` are separate.** `ready` covers only the
+core workload, so a consumer can render "app is up, TLS still issuing" instead of
+a blanket "not ready" for an app that is already serving. Check both before
+declaring the app healthy.
+
+`darlane.ttl` is a duration (`"4h"`), not an expiry timestamp — the composition
+has no clock. Combine it with the Deployment's `creationTimestamp` to compute one.
+
+This XR does **not** compose an `XTenantDatabase`; `secretsFrom.database` only
+wires an existing Secret in by name and is never waited on, so database
+provisioning is not reflected in either field.
+
+> Poll these fields rather than the native `type: Ready` condition, which is
+> unreliable on Crossplane v2.3 with function-kcl v0.12.1.
 
 ## Vault secrets & databases
 

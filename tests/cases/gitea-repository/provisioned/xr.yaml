@@ -1,0 +1,18 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaRepository
+metadata:
+  name: team-alpha-api-service
+spec:
+  parameters:
+    giteaUrl: https://gitea.example.com
+    orgName: team-alpha
+    repoName: api-service
+    description: Alpha squad API service
+    private: true
+    autoInit: true
+    defaultBranch: main
+    hasIssues: true
+    hasPullRequests: true
+    credentialsSecretRef:
+      name: gitea-credentials
+      namespace: crossplane-system

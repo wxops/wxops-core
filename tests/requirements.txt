@@ -1,0 +1,8 @@
+# Python dependencies for the wxops-core test suite.
+#
+#   pip install -r tests/requirements.txt
+#
+# PyYAML is usually already present; jsonschema is not, and tests/xrd.py needs it
+# to validate XRs against the openAPIV3Schema in package/*/xrd.yaml.
+PyYAML>=6.0
+jsonschema>=4.10

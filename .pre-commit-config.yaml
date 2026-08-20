@@ -84,7 +84,9 @@ repos:
           - -schema-location
           - default
           - -schema-location
-          - "https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
+          # Pinned: tracking `main` would let upstream change what this hook accepts
+          # with no commit here. Keep in sync with CRDS_CATALOG_REF in the Makefile.
+          - "https://raw.githubusercontent.com/datreeio/CRDs-catalog/52b0261318acc7dd0b66e032759b1f218216b980/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json"
           - -ignore-missing-schemas
           - -summary
           - -output
@@ -95,6 +97,8 @@ repos:
             examples/.*|
             kcl/.*|
             \.gitea/.*|
+            \.github/.*|
+            \.gitlab/.*|
             VERSIONS\.yaml|
             CHANGELOG\.md|
             .pre-commit-config\.yaml|
@@ -125,7 +129,7 @@ repos:
         language: python
         entry: python3 .gitea/scripts/kcl-sync.py --check
         pass_filenames: false
-        files: ^(kcl/|package/(platform-database-clusters|tenant-database)/composition\.yaml)
+        files: ^(kcl/|package/(platform-database-clusters|tenant-database|tenant-app)/composition\.yaml)
 
   # ── Package version bump enforcement ─────────────────────────────────────────
   # Ensures VERSIONS.yaml carries a bumped version for every package whose YAML
@@ -155,3 +159,35 @@ repos:
         entry: python3 .gitea/scripts/gen-readme-packages.py --check
         pass_filenames: false
         files: ^(VERSIONS\.yaml|README\.md|package/[^/]+/xrd\.yaml)$
+
+  # ── Test suite ───────────────────────────────────────────────────────────────
+  # See tests/README.md. Split by cost:
+  #   xrd + invariants  — no Docker, ~0.5s total, run on every commit
+  #   golden            — ~90s (a container per function per case), runs on push
+  # Requires: pip install -r tests/requirements.txt  (or `make test-deps`)
+  - repo: local
+    hooks:
+      - id: test-xrd
+        name: XRs conform to our XRD schemas
+        language: python
+        additional_dependencies: [pyyaml, jsonschema]
+        entry: python3 tests/xrd.py
+        pass_filenames: false
+        files: ^(package/[^/]+/xrd\.yaml|examples/|tests/cases/)
+
+      - id: test-invariants
+        name: composition invariants and field contracts
+        language: python
+        additional_dependencies: [pyyaml]
+        entry: python3 tests/invariants.py
+        pass_filenames: false
+        files: ^(tests/|kcl/|package/[^/]+/composition\.yaml)
+
+      - id: test-golden
+        name: golden render tests (slow — push only)
+        language: python
+        additional_dependencies: [pyyaml, jsonschema]
+        entry: python3 tests/golden.py
+        pass_filenames: false
+        stages: [pre-push]
+        files: ^(kcl/|package/|tests/|examples/)

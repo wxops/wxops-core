@@ -25,6 +25,7 @@ and optional shared-cluster labeling for dynamic tenant pool discovery.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
+| `cluster` | `string` | | `"default"` | Name of the provider-kubernetes `ProviderConfig` to apply composed resources through. `"default"` is the local hub cluster — the only one wired up today, so leaving this unset is behaviour-neutral. Set it to target a spoke cluster once a `ProviderConfig` for it exists — see [multi-cluster.md](multi-cluster.md). |
 | `clusterName` | `string` | yes | | CNPG cluster name. Tenants pass this value as `clusterRef` in `XTenantDatabase` to locate the cluster and its superuser secret. |
 | `namespace` | `string` | yes | | Kubernetes namespace where the CNPG cluster is created. |
 | `instances` | `integer` (1–9) | | `1` | Number of PostgreSQL instances. `1` = standalone (dev/test), `3` = HA. |
@@ -161,6 +162,17 @@ instance is never touched after the cluster is `Ready`.
 | `bootstrapFrom.sourcePasswordSecretRef` | `object` | | | Existing K8s Secret with key `password` holding the source superuser password. Must exist before the XR is applied. |
 | `bootstrapFrom.sourcePasswordSecretRef.name` | `string` | | | |
 | `bootstrapFrom.sourcePasswordSecretRef.namespace` | `string` | | | |
+
+## `status`
+
+| Field | Type | Description |
+|---|---|---|
+| `clusterName` | `string` | Echoed from `spec.parameters.clusterName`. |
+| `namespace` | `string` | Namespace where the CNPG cluster lives. |
+| `shared` | `boolean` | Whether this cluster is in the shared multi-tenant pool. |
+| `environment` | `string` | Environment this cluster serves (`dev`, `staging`, `prod`). |
+| `created` | `boolean` | True once every composed resource has been observed at least once. Indicates provisioning has started, not that it succeeded. |
+| `ready` | `boolean` | True when the cluster can serve connections: the CNPG `Cluster` is up, and any enabled pooler is up too — tenants are handed the pooler endpoint, not the cluster's directly. Derived from observed composed-resource state rather than the native `type: Ready` condition, which is unreliable on Crossplane v2.3 with function-kcl v0.12.1. **Poll this field, not conditions.** Vault credential seeding and scheduled backups are deliberately excluded — neither stops a running cluster from serving. |
 
 ## Required discovery label
 

@@ -1,0 +1,11 @@
+# expect: is not one of ['dev', 'staging', 'prod']
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantApp
+metadata:
+  name: bad-env
+spec:
+  parameters:
+    appName: payment-api
+    namespace: rocket-team-production
+    image: ghcr.io/x/y:1
+    environment: production
