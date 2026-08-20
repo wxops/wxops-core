@@ -54,6 +54,12 @@ repos:
       - id: check-merge-conflict
       - id: mixed-line-ending
         args: [--fix=lf]
+      # Blocks `git commit` while checked out on main — catches the mistake
+      # before it even happens, not just before a push. Local safety net only:
+      # anyone without this hook installed, or using --no-verify, bypasses it.
+      # Real enforcement needs a server-side branch protection rule.
+      - id: no-commit-to-branch
+        args: [--branch, main]
 
   # ── YAML style ───────────────────────────────────────────────────────────────
   - repo: https://github.com/adrienverge/yamllint

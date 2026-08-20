@@ -4,17 +4,15 @@ name: Validate
 # .gitea/workflows/pr-validate.yaml — same checks, same order, kept in sync by
 # hand since Gitea and GitHub Actions do not share a workflow file.
 #
-# Gitea is the primary repo; GitHub is a push-mirror used for public
-# distribution and external contributions. A PR opened here needs its own gate
-# because nothing else runs against it — the Gitea workflow only sees pushes
-# that land in Gitea directly.
+# Gitea was primary through v0.4.0; GitHub is primary from v0.5.0, Gitea
+# archived. A PR opened here needs its own gate regardless — nothing else
+# validates a GitHub-side PR.
 #
-# Also runs on push to main (i.e. when a mirrored commit arrives) so a commit
-# that bypassed review on the Gitea side is still caught here, after the fact.
+# PR-only, deliberately: this does not also run on push to main. A merge into
+# main is only reachable through a PR that already passed this gate, so a
+# second run there would just repeat the same checks against the same commit.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
 
 # A force-push or a rebase makes in-flight runs irrelevant; do not pay for them.
