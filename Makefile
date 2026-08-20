@@ -209,7 +209,7 @@ release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=m
 	else \
 		echo "→ CHANGELOG.md updated for $$ver"; \
 		git add CHANGELOG.md; \
-		git commit -m "chore(release): prepare for release $$ver"; \
+		SKIP=no-commit-to-branch git commit -m "chore(release): prepare for release $$ver"; \
 	fi; \
 	echo "→ tagging $$ver"; \
 	git tag "$$ver"; \

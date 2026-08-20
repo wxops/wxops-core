@@ -15,13 +15,32 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
-## [Unreleased]
+## [0.4.0] — 2026-08-20
+
+### CI/CD
+
+- **ci**: Ignore main pr-validate on main and add the validation pre-commit to merge into main ([`321f5ce`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/321f5ce9b95a7e37a42c6f3886b8940bd34c6f5d))
+
 
 ### Documentation
 
 - Add research about multi-cluster for core w'xops ([`5d9f856`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/5d9f8565f1e12985b97bd21833c24aa06b183c97))
 
 
+### Features
+
+- Add observability xtenantapp and status for whole compositions in W'xOps Core ([`532b34f`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/532b34f572327f7ba2f3d54e5562aab218bd752c))
+
+
+
+📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.4.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.4.0/VERSIONS.yaml)
+🔍 [Full series diff (v0.3.0 → v0.4.0)](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.0...v0.4.0)
+
+> ⚠️ **Major/minor version bump** — this diff covers the entire **0.3.x**
+> patch series (v0.3.0 through v0.3.4) so no intermediate patch is missed.
+> Check [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.4.0/VERSIONS.yaml)
+> for affected packages and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.4.0/docs)
+> for schema changes.
 ## [0.3.4] — 2026-07-13
 
 ### Bug Fixes
@@ -220,6 +239,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/v0.1.0/VERSIONS.yaml)
 ---
+[0.4.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.4.0
 [0.3.4]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.4
 [0.3.3]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.3
 [0.3.2]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.3.2
@@ -235,5 +255,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.3.4...HEAD
+[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/v0.4.0...HEAD
 
