@@ -4,12 +4,11 @@ name: Validate
 # publish-packages.yaml only triggers on v* tags, and the pre-commit hooks run
 # locally where `--no-verify` bypasses them. Anything could land on main.
 #
-# Also runs on push to main so a direct commit or a bypassed hook is still caught,
-# even though it is caught after the fact.
+# PR-only, deliberately: this does not also run on push to main. A merge into
+# main is only reachable through a PR that already passed this gate, so a
+# second run there would just repeat the same checks against the same commit.
 on:
   pull_request:
-    branches: [main]
-  push:
     branches: [main]
 
 # A force-push or a rebase makes in-flight runs irrelevant; do not pay for them.
