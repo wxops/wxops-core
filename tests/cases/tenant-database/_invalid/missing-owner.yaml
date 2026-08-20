@@ -1,0 +1,11 @@
+# expect: 'owner' is a required property
+#
+# owner scopes both the PostgreSQL role name and the Vault path. Missing, it would
+# produce a role and secret path with an empty segment.
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantDatabase
+metadata:
+  name: no-owner
+spec:
+  parameters:
+    dbName: payments

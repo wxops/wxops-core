@@ -74,3 +74,35 @@ spec:
                           type: string
                         namespace:
                           type: string
+            status:
+              type: object
+              properties:
+                created:
+                  type: boolean
+                  description: |
+                    True once the Terraform apply has completed and written state.
+                    Derived from the presence of the org_id output, which only
+                    exists after a successful apply.
+
+                    Absent — not false — until that first successful apply, because
+                    the patch is skipped while its source path does not exist. Treat
+                    absent as false. (The KCL-based packages emit an explicit false
+                    instead; this is the one place the contract differs.)
+                ready:
+                  type: boolean
+                  description: |
+                    True when the Gitea organisation exists. Equal to `created` by
+                    construction — a organisation either exists or does not, there is no
+                    rollout phase — but exposed under the same name every other
+                    W'xOps package uses so consumers have one field to poll.
+
+                    Caveat: this reflects the last *successful* apply. If a later
+                    apply fails the outputs persist, so `ready` stays true while the
+                    Workspace's Synced condition goes False. Check Synced alongside
+                    this field to detect drift or a failing reconcile.
+                orgId:
+                  type: string
+                  description: Gitea's internal numeric organisation ID.
+                orgName:
+                  type: string
+                  description: Resolved organisation name (echoed from the Terraform output).

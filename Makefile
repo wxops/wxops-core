@@ -1,5 +1,11 @@
 REGISTRY ?= ghcr.io/wxops
 
+# datreeio CRDs-catalog ref used for third-party schema lookups. PINNED on
+# purpose: tracking `main` would let upstream change what CI accepts with no
+# commit in this repo, making the gate non-reproducible. Bump alongside the
+# reference stack in CLAUDE.md. Keep in sync with CATALOG_REF in tests/structural.py.
+CRDS_CATALOG_REF ?= 52b0261318acc7dd0b66e032759b1f218216b980
+
 PACKAGES := gitea-user gitea-org gitea-team gitea-repository platform-database-clusters tenant-database tenant-app
 
 # ── Package build & publish ──────────────────────────────────────────────────
@@ -58,20 +64,75 @@ lint: ## YAML lint + kubeconform schema validation
 	@echo "→ kubeconform (package/)"
 	@find package/ -name '*.yaml' | xargs kubeconform \
 		-schema-location default \
-		-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/main/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
+		-schema-location 'https://raw.githubusercontent.com/datreeio/CRDs-catalog/$(CRDS_CATALOG_REF)/{{.Group}}/{{.ResourceKind}}_{{.ResourceAPIVersion}}.json' \
 		-ignore-missing-schemas \
 		-summary
 
+# Every function any composition references must be listed, or render fails with
+# "unknown function ... is it listed in the render input?".
+FUNCTIONS := providers/function-kcl.yaml \
+             providers/function-patch-and-transform.yaml \
+             providers/function-extra-resources.yaml
+
 .PHONY: render
 render: ## Render example XRs against compositions (offline dry-run)
-	@for pkg in $(PACKAGES); do \
+	@fns="$$(mktemp)"; err="$$(mktemp)"; \
+	for f in $(FUNCTIONS); do echo "---"; cat "$$f"; done > "$$fns"; \
+	failed=""; \
+	for pkg in $(PACKAGES); do \
 		echo "→ rendering examples/$$pkg/xr.yaml"; \
-		crossplane composition render \
-			examples/$$pkg/xr.yaml \
-			package/$$pkg/composition.yaml \
-			providers/function-kcl.yaml \
-			2>/dev/null || true; \
-	done
+		req=""; \
+		if [ -f "examples/$$pkg/required-resources.yaml" ]; then \
+			req="--required-resources=examples/$$pkg/required-resources.yaml"; \
+		fi; \
+		if ! crossplane composition render \
+				examples/$$pkg/xr.yaml \
+				package/$$pkg/composition.yaml \
+				"$$fns" $$req 2>"$$err"; then \
+			sed 's/^/    /' "$$err" >&2; \
+			failed="$$failed $$pkg"; \
+		fi; \
+	done; \
+	rm -f "$$fns" "$$err"; \
+	if [ -n "$$failed" ]; then \
+		echo "" >&2; echo "render FAILED:$$failed" >&2; exit 1; \
+	fi
+
+# ── Tests ────────────────────────────────────────────────────────────────────
+# Offline. No cluster required — `crossplane composition render` runs the real
+# function images in Docker. See tests/README.md for what this can and cannot
+# catch; notably it cannot catch provider RBAC gaps.
+
+PYTHON ?= python3
+
+.PHONY: test
+test: test-xrd test-golden test-invariants ## Run the offline test suite (the merge gate)
+	@echo ""
+	@echo "test suite passed"
+
+.PHONY: test-xrd
+test-xrd: ## Strict: XRs conform to our XRDs; negative cases are rejected
+	@$(PYTHON) tests/xrd.py
+
+.PHONY: test-golden
+test-golden: ## Golden render tests — output vs committed expectations
+	@$(PYTHON) tests/golden.py
+
+.PHONY: test-invariants
+test-invariants: ## Rules that must hold for every package and case
+	@$(PYTHON) tests/invariants.py
+
+.PHONY: test-structural
+test-structural: ## Best-effort third-party schema filter (NOT in `make test`)
+	@$(PYTHON) tests/structural.py
+
+.PHONY: test-update
+test-update: ## Regenerate goldens after an intentional composition change
+	@$(PYTHON) tests/golden.py --update
+
+.PHONY: test-deps
+test-deps: ## Install the test suite's Python dependencies
+	@pip install -r tests/requirements.txt
 
 # ── Cluster install ───────────────────────────────────────────────────────────
 

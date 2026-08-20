@@ -1,0 +1,88 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XGiteaTeam
+metadata:
+  name: team-alpha-backend
+spec:
+  crossplane:
+    resourceRefs:
+      - apiVersion: tf.upbound.io/v1beta1
+        kind: Workspace
+        name: team-alpha-backend-999a233abdb0
+status:
+  conditions:
+    - reason: WatchCircuitClosed
+      status: 'True'
+      type: Responsive
+    - reason: ReconcileSuccess
+      status: 'True'
+      type: Synced
+    - message: 'Unready resources: tf-workspace'
+      reason: Creating
+      status: 'False'
+      type: Ready
+---
+apiVersion: tf.upbound.io/v1beta1
+kind: Workspace
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: tf-workspace
+  generateName: team-alpha-backend-
+  labels:
+    crossplane.io/composite: team-alpha-backend
+  name: team-alpha-backend-999a233abdb0
+  ownerReferences:
+    - apiVersion: platform.wxops.cloud/v1alpha1
+      blockOwnerDeletion: true
+      controller: true
+      kind: XGiteaTeam
+      name: team-alpha-backend
+      uid: 02d838f0-0dc4-5e26-bf47-889ec3ec9a14
+spec:
+  forProvider:
+    module: "terraform {\n  required_providers {\n    gitea = {\n      source  = \"go-gitea/gitea\"\n      version = \"~> 0.7.0\"\n    }\n    null = {\n      source  = \"hashicorp/null\"\n      version = \"~> 3.0\"\n    }\n  }\n}\n\nvariable \"gitea_url\"  { type = string }\nvariable \"insecure\" {\n  type    = bool\n  default = false\n}\nvariable \"org_name\"  { type = string }\nvariable \"team_name\" { type = string }\nvariable \"description\" {\n  type    = string\n  default = \"\"\n}\nvariable \"permission\" {\n  type    = string\n  default = \"read\"\n}\nvariable \"units\" {\n  type    = string\n  default = \"repo.code,repo.issues,repo.pulls\"\n}\nvariable \"include_all_repositories\" {\n  type    = bool\n  default = false\n}\nvariable \"can_create_repos\" {\n  type    = bool\n  default = false\n}\n# Comma-separated usernames. Empty string means no members.\nvariable \"members\" {\n  type    = string\n  default = \"\"\n}\nvariable \"enable_actions\" {\n  type    = bool\n  default =\
+      \ false\n}\nvariable \"actions_read_only\" {\n  type    = bool\n  default = false\n}\nvariable \"enable_packages\" {\n  type    = bool\n  default = false\n}\nvariable \"packages_read_only\" {\n  type    = bool\n  default = false\n}\n\nvariable \"gitea_token\" {\n  type      = string\n  sensitive = true\n}\n\nprovider \"gitea\" {\n  base_url = var.gitea_url\n  token    = var.gitea_token\n  insecure = var.insecure\n}\n\nresource \"gitea_team\" \"this\" {\n  name                     = var.team_name\n  organisation             = var.org_name\n  description              = var.description\n  permission               = var.permission\n  units                    = var.units\n  include_all_repositories = var.include_all_repositories\n  can_create_repos         = var.can_create_repos\n}\n\n# Membership is reconciled on every sync.\n# Removing a username from the list removes them from the team.\nlocals {\n  member_list = var.members == \"\" ? [] : [\n    for m in split(\",\", var.members) :\
+      \ trimspace(m)\n  ]\n}\n\nresource \"gitea_team_membership\" \"this\" {\n  for_each = toset(local.member_list)\n  team_id  = gitea_team.this.id\n  username = each.key\n}\n\n# repo.actions and repo.packages are not in the Terraform provider\n# unit enum (v0.7.x), so they are applied via direct Gitea API call.\n# When a readOnly flag is active, switches to units_map so that unit\n# gets \"read\" while all base units keep the configured permission.\nresource \"null_resource\" \"extended_units\" {\n  count = (var.enable_actions || var.enable_packages) ? 1 : 0\n\n  triggers = {\n    team_id            = gitea_team.this.id\n    units              = var.units\n    permission         = var.permission\n    enable_actions     = tostring(var.enable_actions)\n    enable_packages    = tostring(var.enable_packages)\n    actions_read_only  = tostring(var.actions_read_only)\n    packages_read_only = tostring(var.packages_read_only)\n  }\n\n  provisioner \"local-exec\" {\n    environment = {\n    \
+      \  GITEA_TOKEN        = var.gitea_token\n      GITEA_URL          = var.gitea_url\n      TEAM_ID            = tostring(gitea_team.this.id)\n      BASE_UNITS         = var.units\n      PERMISSION         = var.permission\n      ENABLE_ACTIONS     = tostring(var.enable_actions)\n      ENABLE_PACKAGES    = tostring(var.enable_packages)\n      ACTIONS_READ_ONLY  = tostring(var.actions_read_only)\n      PACKAGES_READ_ONLY = tostring(var.packages_read_only)\n      INSECURE           = tostring(var.insecure)\n    }\n    command = <<-EOT\n      ACTIONS_PERM=\"\"\n      [ \"$ENABLE_ACTIONS\" = \"true\" ] && ACTIONS_PERM=\"$PERMISSION\"\n      [ \"$ENABLE_ACTIONS\" = \"true\" ] && [ \"$ACTIONS_READ_ONLY\" = \"true\" ] && ACTIONS_PERM=\"read\"\n      PACKAGES_PERM=\"\"\n      [ \"$ENABLE_PACKAGES\" = \"true\" ] && PACKAGES_PERM=\"$PERMISSION\"\n      [ \"$ENABLE_PACKAGES\" = \"true\" ] && [ \"$PACKAGES_READ_ONLY\" = \"true\" ] && PACKAGES_PERM=\"read\"\n      USE_MAP=\"false\"\n      [ \"$ACTIONS_READ_ONLY\"\
+      \ = \"true\" ] && [ \"$ENABLE_ACTIONS\" = \"true\" ] && USE_MAP=\"true\"\n      [ \"$PACKAGES_READ_ONLY\" = \"true\" ] && [ \"$ENABLE_PACKAGES\" = \"true\" ] && USE_MAP=\"true\"\n      if [ \"$USE_MAP\" = \"true\" ]; then\n        MAP=\"{\"\n        SEP=\"\"\n        for UNIT in $(echo \"$BASE_UNITS\" | tr ',' ' '); do\n          [ -z \"$UNIT\" ] && continue\n          MAP=$MAP$SEP'\"'$UNIT'\":\"'$PERMISSION'\"'\n          SEP=\",\"\n        done\n        if [ -n \"$ACTIONS_PERM\" ]; then\n          MAP=$MAP$SEP'\"repo.actions\":\"'$ACTIONS_PERM'\"'\n          SEP=\",\"\n        fi\n        if [ -n \"$PACKAGES_PERM\" ]; then\n          MAP=$MAP$SEP'\"repo.packages\":\"'$PACKAGES_PERM'\"'\n        fi\n        MAP=$MAP\"}\"\n        BODY='{\"units_map\":'$MAP'}'\n      else\n        UNITS=\"$BASE_UNITS\"\n        [ \"$ENABLE_ACTIONS\" = \"true\" ] && UNITS=\"$UNITS,repo.actions\"\n        [ \"$ENABLE_PACKAGES\" = \"true\" ] && UNITS=\"$UNITS,repo.packages\"\n        UNITS_JSON=$(echo\
+      \ \"$UNITS\" | awk '{\n          n = split($0, a, \",\")\n          s = \"[\"\n          for (i = 1; i <= n; i++) {\n            gsub(/^[[:space:]]+|[[:space:]]+$/, \"\", a[i])\n            s = s \"\\\"\" a[i] \"\\\"\"\n            if (i < n) s = s \",\"\n          }\n          print s \"]\"\n        }')\n        BODY='{\"units\":'$UNITS_JSON'}'\n      fi\n      CURL_FLAGS=\"-sf\"\n      [ \"$INSECURE\" = \"true\" ] && CURL_FLAGS=\"$CURL_FLAGS -k\"\n      curl $CURL_FLAGS -X PATCH \\\n        \"$GITEA_URL/api/v1/teams/$TEAM_ID\" \\\n        -H \"Authorization: token $GITEA_TOKEN\" \\\n        -H \"Content-Type: application/json\" \\\n        -d \"$BODY\"\n    EOT\n  }\n}\n\noutput \"team_id\"   { value = gitea_team.this.id }\noutput \"team_name\" { value = gitea_team.this.name }\n"
+    source: Inline
+    varFiles:
+      - secretKeyRef:
+          key: credentials
+          name: gitea-credentials
+          namespace: crossplane-system
+        source: SecretKey
+    vars:
+      - key: gitea_url
+        value: https://gitea.example.com
+      - key: org_name
+        value: team-alpha
+      - key: team_name
+        value: backend
+      - key: description
+        value: Backend engineers
+      - key: permission
+        value: write
+      - key: units
+        value: repo.code,repo.issues,repo.pulls,repo.releases
+      - key: include_all_repositories
+        value: 'false'
+      - key: can_create_repos
+        value: 'false'
+      - key: members
+        value: alice,bob
+      - key: insecure
+        value: 'false'
+      - key: enable_actions
+        value: 'false'
+      - key: actions_read_only
+        value: 'false'
+      - key: enable_packages
+        value: 'false'
+      - key: packages_read_only
+        value: 'false'
+  providerConfigRef:
+    name: default
+  writeConnectionSecretToRef:
+    name: tf-gitea-team-02d838f0-0dc4-5e26-bf47-889ec3ec9a14
+    namespace: crossplane-system

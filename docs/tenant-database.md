@@ -20,6 +20,7 @@ ESO sync.
 
 | Field | Type | Required | Default | Description |
 |---|---|---|---|---|
+| `cluster` | `string` | | `"default"` | Name of the provider-kubernetes `ProviderConfig` to apply composed resources through. Not to be confused with `clusterRef` below, which names a *CNPG* cluster — this is the Kubernetes cluster the resources land on. `"default"` is the local hub, so leaving this unset is behaviour-neutral. See [multi-cluster.md](multi-cluster.md). |
 | `tier` | `string` (`shared`, `dedicated`) | | `"shared"` | **`shared`** — auto-assign to the least-loaded `XPlatformDatabaseCluster` labeled `shared: true` and matching this database's `environment`. The composition discovers shared clusters at render time via `function-extra-resources`, counts existing tenant databases per cluster, and picks the one with the fewest tenants. Prevents `dbName` collisions per cluster. The assignment is **sticky** — once resolved, subsequent reconciles reuse the same cluster. **`dedicated`** — compose a new `XPlatformDatabaseCluster` as a child resource (1 cluster = 1 database, fully isolated). Size the child cluster via `dedicatedCluster`. Ignored if `clusterRef`/`clusterNamespace` are set explicitly. |
 | `environment` | `string` (`dev`, `staging`, `prod`) | | `"dev"` | Pool isolation: for `tier: shared`, the pool is filtered to clusters matching this environment. For `tier: dedicated`, passed through to the child cluster's `environment` field. |
 | `dedicatedCluster` | `object` | | `{}` | Cluster sizing parameters when `tier` is `dedicated`. Ignored for `tier: shared` or when `clusterRef` is set explicitly. |
@@ -57,6 +58,17 @@ ESO sync.
 > This only affects the `retain → delete` transition. XRs created with
 > `delete` from the start have full lifecycle cleanup (create → delete →
 > Vault entry removed).
+
+## `status`
+
+| Field | Type | Description |
+|---|---|---|
+| `clusterRef` | `string` | Resolved CNPG cluster name this database is provisioned on. Sticky once assigned; other `XTenantDatabase` XRs read this via `function-extra-resources` for per-cluster tenant counting. |
+| `clusterNamespace` | `string` | Namespace of the resolved cluster. |
+| `tier` | `string` | Resolved tier (`shared`, `dedicated`, or `explicit`). |
+| `dbName` | `string` | PostgreSQL database name (echoed for cross-XR collision checks). |
+| `created` | `boolean` | True once every composed resource has been observed at least once. Indicates provisioning has started, not that it succeeded. |
+| `ready` | `boolean` | True when the database is usable: it exists, its owning role exists, and the connection Secret has materialised (plus, on `tier: dedicated`, the child cluster is up). Derived from observed composed-resource state rather than the native `type: Ready` condition, which is unreliable on Crossplane v2.3 with function-kcl v0.12.1. **Poll this field, not conditions.** The Vault credential push (`PushSecret`) is deliberately excluded — if it lags, applications can still connect. |
 
 ## Required discovery labels
 

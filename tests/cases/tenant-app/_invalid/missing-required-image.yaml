@@ -1,0 +1,13 @@
+# expect: 'image' is a required property
+#
+# The most important negative case in the suite: `crossplane render` accepts this
+# XR and produces a Deployment with no image, because render does not enforce the
+# XRD. A real cluster rejects it at admission. Without this test the gap is invisible.
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantApp
+metadata:
+  name: no-image
+spec:
+  parameters:
+    appName: payment-api
+    namespace: rocket-team-production

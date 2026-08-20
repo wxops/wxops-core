@@ -1,0 +1,10 @@
+# expect: is not one of ['shared', 'dedicated']
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantDatabase
+metadata:
+  name: bad-tier
+spec:
+  parameters:
+    dbName: payments
+    owner: rocket-team
+    tier: isolated

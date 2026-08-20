@@ -1,0 +1,25 @@
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantDatabase
+metadata:
+  name: rocket-team-analytics-db
+  labels:
+    wxops.cloud/tenant-database: "true"
+spec:
+  parameters:
+    tier: dedicated
+    environment: dev
+    dedicatedCluster:
+      instances: 1
+      storageSize: "1Gi"
+      postgresVersion: 16
+      enablePooler: true
+      # namespace: cnpg-system  # default
+
+    dbName: analytics-db
+    owner: rocket-team
+    extensions:
+      - uuid-ossp
+      - pgcrypto
+
+    # databaseReclaimPolicy: "retain"
+    vaultSecretStoreName: "vault-tenant"

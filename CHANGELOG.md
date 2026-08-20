@@ -15,6 +15,13 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
+## [Unreleased]
+
+### Documentation
+
+- Add research about multi-cluster for core w'xops ([`5d9f856`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/5d9f8565f1e12985b97bd21833c24aa06b183c97))
+
+
 ## [0.3.4] — 2026-07-13
 
 ### Bug Fixes

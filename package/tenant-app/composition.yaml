@@ -232,11 +232,21 @@ spec:
             # declared-but-unset on schema-typed objects from oxr.spec.parameters (it
             # returns Undefined instead). Use membership checks via this helper instead.
             _get = lambda d: any, k: str, default: any -> any {
-                d[k] if k in d else default
+                _safe = d or {}
+                _safe[k] if k in _safe else default
             }
 
             appName = params.appName
             ns = params.namespace
+
+            # ── Target cluster ──────────────────────────────────────────────────
+            # Every composed Object is applied through a provider-kubernetes
+            # ProviderConfig. "default" is the local (hub) cluster, which is the only
+            # one wired up today, so leaving spec.parameters.cluster unset keeps
+            # behaviour identical. Naming the ProviderConfig here rather than hardcoding
+            # it means adding a spoke later is a ProviderConfig + one field, not an edit
+            # to every resource in this file. See docs/multi-cluster.md.
+            targetCluster = _get(params, "cluster", "default")
             appFlavor = _get(params, "appFlavor", "webapp")
             environment = _get(params, "environment", "dev")
             _imagePullSecrets = _get(params, "imagePullSecrets", [])
@@ -455,7 +465,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-deployment") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "apps/v1"
@@ -577,7 +587,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-deployment") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "apps/v1"
@@ -617,7 +627,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-sa") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -646,7 +656,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-telemetry-svc") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -675,7 +685,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-service") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -705,7 +715,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-svc") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -740,7 +750,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-weighted-traefikservice") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "traefik.io/v1alpha1"
@@ -839,7 +849,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-certificate") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "cert-manager.io/v1"
@@ -873,7 +883,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-ingress") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "traefik.io/v1alpha1"
@@ -907,7 +917,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-darlane-ingressroute") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "traefik.io/v1alpha1"
@@ -938,7 +948,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-sa") else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -965,7 +975,7 @@ spec:
                     } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-pvc-" + v.name) else {})
                 }
                 spec = {
-                    providerConfigRef = {name = "default"}
+                    providerConfigRef = {name = targetCluster}
                     forProvider = {
                         manifest = {
                             apiVersion = "v1"
@@ -976,6 +986,110 @@ spec:
                     }
                 }
             } for v in _volumes if _get(v, "create", False)]
+
+            # ── Monitoring — ServiceMonitor / PodMonitor ────────────────────────
+            # Emits a real Prometheus Operator CRD. The prometheus.io/* pod annotations
+            # this replaces are inert here: they are a convention read only by a
+            # kubernetes_sd_config job with matching relabel rules, and
+            # kube-prometheus-stack's additionalScrapeConfigs is empty.
+            # Full rationale: docs/observability.md
+            _mon = _get(params, "monitoring", {})
+            _monEnabled = _get(_mon, "enabled", False)
+            _monKind = _get(_mon, "kind", "auto")
+            _monPort = _get(_mon, "port", containerPort)
+            _monPath = _get(_mon, "path", "/metrics")
+            _monInterval = _get(_mon, "interval", "30s")
+            _monTimeout = _get(_mon, "scrapeTimeout", "10s")
+            _monSampleLimit = _get(_mon, "sampleLimit", 5000)
+            _monHonorLabels = _get(_mon, "honorLabels", False)
+            _monRelabelings = _get(_mon, "metricRelabelings", [])
+
+            # A ServiceMonitor targets endpoints behind a Service, so it cannot work
+            # without one. Fail loudly rather than emitting nothing and leaving the
+            # operator to discover the gap from an empty Prometheus /targets page.
+            assert not (_monEnabled and _monKind == "ServiceMonitor" and not serviceEnabled), \
+                "monitoring.kind: ServiceMonitor requires service.enabled: true — use kind: PodMonitor (or auto) for Service-less workloads"
+
+            _monResolved = ("ServiceMonitor" if serviceEnabled else "PodMonitor") if _monKind == "auto" else _monKind
+            _serviceMonitorActive = _monEnabled and _monResolved == "ServiceMonitor"
+            _podMonitorActive = _monEnabled and _monResolved == "PodMonitor"
+
+            # The `release` label is load-bearing: Prometheus is deployed with
+            # serviceMonitorSelectorNilUsesHelmValues: true, so the Operator only picks up
+            # monitors carrying its Helm release name. The value is the directory basename
+            # base/observability-plane/kube-prometheus-stack/ in wxops-gitops-infrastructure
+            # — renaming that directory silently breaks every monitor emitted here, with no
+            # error anywhere; targets simply never appear.
+            _monLabels = labels | {"release" = "kube-prometheus-stack"}
+
+            # targetPort rather than a port name: the app Service emits an unnamed port, and
+            # a ServiceMonitor endpoint referencing a name would never resolve. Naming that
+            # port is the cleaner long-term fix but mutates a live composed resource, so it
+            # is deliberately kept out of this change.
+            _monEndpoint = {
+                targetPort = _monPort
+                path = _monPath
+                interval = _monInterval
+                scrapeTimeout = _monTimeout
+                honorLabels = _monHonorLabels
+            } | ({"metricRelabelings" = _monRelabelings} if _monRelabelings else {})
+
+            # _selectorLabels carries app.kubernetes.io/component = "app". That component
+            # key is what keeps the Darlane twin out of these series — the twin shares
+            # name and instance and differs only by component.
+            _service_monitor = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-servicemonitor"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-servicemonitor"
+                    } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-servicemonitor") else {})
+                }
+                spec = {
+                    providerConfigRef = {name = targetCluster}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "monitoring.coreos.com/v1"
+                            kind = "ServiceMonitor"
+                            metadata = {name = appName, namespace = ns, labels = _monLabels, annotations = _commonAnnotations}
+                            spec = {
+                                selector = {matchLabels = _selectorLabels}
+                                namespaceSelector = {matchNames = [ns]}
+                                sampleLimit = _monSampleLimit
+                                endpoints = [_monEndpoint]
+                            }
+                        }
+                    }
+                }
+            }
+
+            _pod_monitor = {
+                apiVersion = "kubernetes.crossplane.io/v1alpha2"
+                kind = "Object"
+                metadata = {
+                    name = appName + "-podmonitor"
+                    annotations = {
+                        "crossplane.io/composition-resource-name" = "app-podmonitor"
+                    } | ({"krm.kcl.dev/ready" = "True"} if _isReady(appName + "-podmonitor") else {})
+                }
+                spec = {
+                    providerConfigRef = {name = targetCluster}
+                    forProvider = {
+                        manifest = {
+                            apiVersion = "monitoring.coreos.com/v1"
+                            kind = "PodMonitor"
+                            metadata = {name = appName, namespace = ns, labels = _monLabels, annotations = _commonAnnotations}
+                            spec = {
+                                selector = {matchLabels = _selectorLabels}
+                                namespaceSelector = {matchNames = [ns]}
+                                sampleLimit = _monSampleLimit
+                                podMetricsEndpoints = [_monEndpoint]
+                            }
+                        }
+                    }
+                }
+            }
 
             # ── Status write-back (dxr) ─────────────────────────────────────────
             # Emitting an item with the XR's own apiVersion/kind writes status fields back
@@ -997,6 +1111,49 @@ spec:
             _ingressReady = _isReady(appName + "-ingress") if ingressEnabled else True
             _appReady = _deploymentReady and _serviceReady and _ingressReady
 
+            # dependenciesReady — composed resources that do NOT gate the core workload but
+            # do gate the app being usable end-to-end. Split out rather than folded into
+            # `ready` so the portal can render "app is up, TLS still issuing" honestly
+            # instead of showing a blanket "not ready" for a serving application.
+            #
+            # Only the cert-manager Certificate qualifies today. Note this XR does NOT
+            # compose an XTenantDatabase — secretsFrom.database merely wires an existing
+            # Secret in by name and is explicitly not waited on (see the comment above the
+            # Deployment), so there is no database readiness for this XR to report.
+            #
+            # PVCs are not listed: an unbound PVC keeps its pods from starting, so the
+            # Deployment is already unready and `ready` catches it.
+            _certReady = _isReady(appName + "-certificate") if _certificateEnabled else True
+            _dependenciesReady = _certReady
+
+            # ── Darlane status ──────────────────────────────────────────────────
+            # Observed replicas come from the wrapped manifest that provider-kubernetes
+            # writes back (Object.status.atProvider.manifest), NOT from spec — reporting
+            # desired replicas would claim the twin is up the moment it is requested.
+            _observedManifest = lambda name: str -> any {
+                _res = _get(_get(_ocds, name, {}), "Resource", {})
+                _get(_get(_get(_res, "status", {}), "atProvider", {}), "manifest", {})
+            }
+            _darlaneObsStatus = _get(_observedManifest(appName + "-darlane-deployment"), "status", {})
+            _darlaneObservedReplicas = _get(_darlaneObsStatus, "readyReplicas", 0)
+
+            # KCL has no if/elif chain for assignment — chained ternary is the idiom here.
+            _darlaneTrafficMode = "both" if _darlaneWeightedEnabled and _darlaneHeaderRoutingActive \
+                else "weighted" if _darlaneWeightedEnabled \
+                else "header" if _darlaneHeaderRoutingActive \
+                else "none"
+
+            # ttl is a duration string ("4h"), not a timestamp, and KCL has no clock — so
+            # echo what was configured and let the consumer combine it with the Deployment's
+            # creationTimestamp. Emitting a fabricated expiry would be worse than none.
+            _darlaneStatus = {
+                ready = _isReady(appName + "-darlane-deployment")
+                replicas = _darlaneObservedReplicas
+                trafficMode = _darlaneTrafficMode
+                ttl = _darlaneTtl
+                serviceAccountName = _darlaneSaName
+            }
+
             _appUrl = ("https://" if _get(_ingTls, "enabled", False) else "http://") + _get(_ing, "host", "") if ingressEnabled else ""
             _dxr = {
                 apiVersion = oxr.apiVersion
@@ -1004,10 +1161,11 @@ spec:
                 status = {
                     created = _appCreated
                     ready = _appReady
+                    dependenciesReady = _dependenciesReady
                     url = _appUrl
                     namespace = ns
                     image = params.image
-                }
+                } | ({"darlane" = _darlaneStatus} if darlaneEnabled else {})
             }
 
             # ── Final resource list ─────────────────────────────────────────────
@@ -1022,4 +1180,6 @@ spec:
                 + ([_darlane_traefik_service] if _darlaneWeightedEnabled else []) \
                 + ([_certificate] if _certificateEnabled else []) \
                 + ([_ingress_object] if ingressEnabled else []) \
-                + ([_ingress_header_object] if _darlaneHeaderRoutingActive else [])
+                + ([_ingress_header_object] if _darlaneHeaderRoutingActive else []) \
+                + ([_service_monitor] if _serviceMonitorActive else []) \
+                + ([_pod_monitor] if _podMonitorActive else [])

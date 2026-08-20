@@ -1,0 +1,17 @@
+# expect: darlane.trafficWeight
+# expect: maximum
+#
+# trafficWeight is a percentage split across the stable and darlane backends.
+# A value over 100 would silently produce a nonsensical TraefikService weighting.
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantApp
+metadata:
+  name: bad-weight
+spec:
+  parameters:
+    appName: payment-api
+    namespace: rocket-team-production
+    image: ghcr.io/x/y:1
+    darlane:
+      enabled: true
+      trafficWeight: 150

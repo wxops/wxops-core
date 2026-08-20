@@ -1,0 +1,264 @@
+# Contributing to W'xOps Core
+
+W'xOps Core is a library of Crossplane v2 Configuration packages. There is no
+Go controller and no runtime — every package is an `XRD` plus a `Composition`,
+and the "logic" lives in KCL or in patch-and-transform patches.
+
+That shape decides how you contribute: **you change a schema or a template, and
+you prove the rendered output is what you intended.** This document covers the
+workflow, and in particular what a new package owes the test suite.
+
+- Architecture, conventions and the reference stack → [`CLAUDE.md`](CLAUDE.md)
+- Test harness internals → [`tests/README.md`](tests/README.md)
+- What is planned, deferred and rejected → [`ROADMAP.md`](ROADMAP.md)
+- Per-XRD API reference → [`docs/`](docs/)
+
+---
+
+## Setup
+
+```bash
+# Required on PATH
+crossplane   # https://docs.crossplane.io/latest/cli/
+kubeconform  # https://github.com/yannh/kubeconform
+docker       # crossplane render runs functions as containers
+
+python3 -m venv ~/.python3-venv && . ~/.python3-venv/bin/activate
+pip install pre-commit yamllint
+make test-deps          # PyYAML + jsonschema for the test suite
+pre-commit install --install-hooks
+pre-commit install --hook-type pre-push --hook-type commit-msg
+```
+
+The first `make test` pulls ~800MB of function images. After that they are
+cached.
+
+---
+
+## The loop
+
+```bash
+git switch -c feat/short-description
+
+# ... edit ...
+
+make kcl-sync           # if you touched kcl/<pkg>/main.k — REQUIRED
+make test               # the gate
+make lint
+```
+
+Then open a PR against `main`. CI
+([`.gitea/workflows/pr-validate.yaml`](.gitea/workflows/pr-validate.yaml)) runs
+the same gates. Pre-commit is local and `--no-verify` bypasses it; CI does not.
+
+### Commit messages
+
+Conventional Commits, enforced at commit-msg. Allowed types: `feat`, `fix`,
+`perf`, `refactor`, `docs`, `test`, `chore`, `revert`.
+
+There is **no `ci` type** — use `chore(ci):`. Scope with the package name where
+it applies: `feat(tenant-app): ...`.
+
+### Two rules that bite
+
+**`kcl/<pkg>/main.k` and `package/<pkg>/composition.yaml` must be committed
+together.** The KCL is embedded into the composition by `make kcl-sync`, because
+`crossplane xpkg build` only packages the Configuration directory. A drift hook
+rejects a split commit.
+
+**Changed a package? Bump `VERSIONS.yaml`.** Shipping a changed package on an
+existing version overwrites a published OCI tag with different content. Follow
+the rules in the file header: backward-compatible schema change → patch; new
+`api.served` version → minor; breaking → new API version first. Then
+`make readme-sync`. One bump per package per logical release batch, not per
+commit.
+
+---
+
+## Changing an existing composition
+
+1. Edit `kcl/<pkg>/main.k` (or the composition's patches).
+2. `make kcl-sync`
+3. `make test` — golden tests will fail, showing exactly what changed.
+4. **Read that diff.** It is the review. If it contains anything you did not
+   intend, you have found a bug before it shipped.
+5. `make test-update` to accept, then `git diff tests/` once more.
+6. Add a case if you added a branch — see below.
+
+Classify the change against the taxonomy in [`ROADMAP.md`](ROADMAP.md)
+(`safe` / `careful` / `breaking`) and sequence `careful` edits into their own
+commit so they can be reverted alone. Renaming a composed resource, or changing
+an immutable field like a `Deployment` selector or a PVC's `storageClassName`, is
+never `safe` — read the hazard sections before doing either.
+
+---
+
+## Adding a new package
+
+Follow the working model in [`CLAUDE.md`](CLAUDE.md), then the test work below.
+The checklist:
+
+- [ ] `package/<name>/xrd.yaml` — schema-first, minimal, **with `status.created` and `status.ready`**
+- [ ] `package/<name>/composition.yaml`
+- [ ] `kcl/<name>/main.k` + `kcl.mod` if using function-kcl, then `make kcl-sync`
+- [ ] `package/<name>/crossplane.yaml`, `kustomization.yaml`, `README.md`
+- [ ] `examples/<name>/xr.yaml`
+- [ ] `docs/<name>.md` + a row in [`docs/README.md`](docs/README.md)
+- [ ] **`tests/cases/<name>/` — see below**
+- [ ] `PACKAGES` array in [`.gitea/scripts/validate-packages.sh`](.gitea/scripts/validate-packages.sh)
+- [ ] `PACKAGES` in the `Makefile`, and the matrix in [`.gitea/workflows/publish-packages.yaml`](.gitea/workflows/publish-packages.yaml)
+- [ ] `PACKAGES` in [`.gitea/scripts/check-versions-bump.sh`](.gitea/scripts/check-versions-bump.sh) and the `files:` regex of the `versions-bump-check` hook
+- [ ] If KCL: add the package to the `kcl-drift-check` hook's `files:` regex
+- [ ] `VERSIONS.yaml` entry, then `make readme-sync`
+- [ ] Any new API group the composition targets → `providers/rbac-provider-kubernetes.yaml`
+
+That last one has no offline test. provider-kubernetes runs with
+`InjectedIdentity` and Crossplane's RBAC manager grants it nothing on
+third-party CRDs, so a composed `Object` for an ungranted group fails
+`forbidden` at reconcile — and **the test suite cannot catch it**. Check it by
+hand.
+
+### Writing the test cases
+
+A case is a directory of inputs. `expected.yaml` is generated, never written by
+hand.
+
+```
+tests/cases/<package>/<case>/
+├── xr.yaml         input — the spec.parameters under test
+├── observed.yaml   optional — mocked ocds, drives readiness
+├── required.yaml   optional — extra-resources context
+└── expected.yaml   GENERATED golden
+```
+
+**Minimum for a new package — three cases:**
+
+```bash
+mkdir -p tests/cases/<pkg>/baseline
+cp examples/<pkg>/xr.yaml tests/cases/<pkg>/baseline/xr.yaml
+```
+
+1. **`baseline`** — the published example, no `observed.yaml`. Pins the
+   first-reconcile shape: what gets emitted before anything exists, with
+   `created: false` and `ready: false`.
+
+2. **`<something>-ready`** — the same input with observed state, proving
+   readiness actually flips:
+
+   ```bash
+   cp -r tests/cases/<pkg>/baseline tests/cases/<pkg>/provisioned
+   python3 tests/lib/mkobserved.py <pkg> provisioned
+   ```
+
+3. **A degraded case** — one dependency not Ready, proving `ready` discriminates
+   rather than being vacuously true:
+
+   ```bash
+   cp -r tests/cases/<pkg>/baseline tests/cases/<pkg>/degraded
+   python3 tests/lib/mkobserved.py <pkg> degraded --unready <name-substring>
+   ```
+
+Then add **one case per conditional branch** the composition has — every
+`if <toggle>` in the KCL is an untested path until a case exercises it.
+
+Finally, **negative cases** in `tests/cases/<pkg>/_invalid/`, one per constraint
+worth defending — required fields, enums, min/max. Each needs an `# expect:`
+comment naming the error substring, so it cannot pass by failing for an
+unrelated reason:
+
+```yaml
+# expect: 'owner' is a required property
+#
+# owner scopes both the PostgreSQL role name and the Vault path. Missing, it
+# would produce a role and secret path with an empty segment.
+apiVersion: platform.wxops.cloud/v1alpha1
+kind: XTenantDatabase
+metadata:
+  name: no-owner
+spec:
+  parameters:
+    dbName: payments
+```
+
+Generate and review:
+
+```bash
+make test-update
+git diff tests/          # READ IT — this is where you catch your own mistakes
+make test
+```
+
+### Do not
+
+- **Do not hand-write `expected.yaml`.** Generate it and read the diff.
+- **Do not hand-write `observed.yaml` for KCL packages.** Use `mkobserved.py`.
+  Two details are easy to get wrong: `ocds` is keyed by the `Object`'s
+  `metadata.name` and Crossplane rewrites `composition-resource-name` to match,
+  so a mismatched annotation is *silently ignored* and your case tests nothing;
+  and observed replica counts live at
+  `Object.status.atProvider.manifest.status`, not `Object.status`.
+- **Do not accept a golden you have not read.** A golden file is only a test if
+  someone looked at it.
+
+### Adding an invariant
+
+[`tests/invariants.py`](tests/invariants.py) holds rules that must be true for
+every package and case, including ones nobody has written yet. Add one when you
+find a failure mode that is **silent** — no error, no event, just wrong
+behaviour. Examples already there: a monitor missing the `release` label the
+Prometheus Operator filters on; a Vault `remoteKey` repeating the KV mount
+prefix and writing to `tenants/tenants/...`.
+
+```python
+@rule("short-kebab-name",
+      "Why this matters — specifically, how it fails silently in a real cluster.")
+def my_rule(docs, ctx):
+    return [f"{name}: ..." for name, m in _of_kind(docs, "SomeKind") if bad(m)]
+```
+
+**Then prove it bites.** Break a golden file deliberately, confirm the rule
+fires, and restore it. A rule that has never failed has not been tested.
+
+---
+
+## What the tests cannot tell you
+
+A green `make test` means the compositions render what you expect and the API
+contract holds. It does **not** mean it works in a cluster. Out of reach
+offline:
+
+- **provider RBAC gaps** — the most common real failure, and completely
+  invisible here
+- validity against the *actually installed* CRD version, as opposed to the
+  public catalogue the advisory structural check uses
+- whether anything reconciles — CNPG accepting a `Cluster`, Gitea accepting a
+  user, Vault accepting a write
+- ordering, retries, eventual consistency between composed resources
+
+Before a release, exercise the change on a real cluster. A kind-based e2e tier
+is tracked in [`ROADMAP.md`](ROADMAP.md).
+
+---
+
+## Boundaries
+
+Some things are settled. Check [`ROADMAP.md`](ROADMAP.md) *Out of scope* and
+*Decided and rejected* before proposing them — the list exists so contributors
+do not spend a weekend on something that will be declined.
+
+The two most likely to catch you out:
+
+- **No hand-written controllers.** A `kubebuilder` Go controller was built,
+  rejected and removed. Crossplane v2 with provider-terraform and
+  provider-kubernetes is the architecture.
+- **Compositions never emit Kubernetes RBAC.** No `Role`, `ClusterRole`,
+  `RoleBinding`, `ClusterRoleBinding` — provider-kubernetes is deliberately not
+  granted `rbac.authorization.k8s.io`, and granting it would make the provider a
+  privilege-escalation vector. The composition creates the ServiceAccount and
+  publishes its name in status; the GitOps repo binds a role to it. An invariant
+  enforces this, so a PR that tries will fail.
+
+## Licence
+
+Apache-2.0. See [`LICENSE`](LICENSE) and [`NOTICE`](NOTICE). Contributions are
+accepted under the same terms, per §5 of the licence.

@@ -33,7 +33,18 @@ rules:
   - apiGroups: ["postgresql.sql.crossplane.io"]
     resources: ["providerconfigs", "roles"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
-  # RBAC for ESO's superuser-secret reader (platform-database-clusters)
+  # INTENTIONALLY DISABLED — do not uncomment.
+  # Compositions in this repo must never emit Role/ClusterRole/RoleBinding. Granting the
+  # provider RBAC write access makes it a privilege-escalation vector: Kubernetes' escalation
+  # check only blocks granting permissions the creator lacks, and this ServiceAccount already
+  # holds broad grants, so the guard is weakest exactly where it would matter. RBAC also
+  # deserves human review on a diff, which it gets in the GitOps repo and does not get when
+  # generated from KCL.
+  #
+  # The seam instead: a composition creates the ServiceAccount and publishes its name in the
+  # XR status (see XTenantApp status.darlane.serviceAccountName); the GitOps repo defines the
+  # Role and binds it. This is why darlane.rbac was dropped — see ROADMAP.md
+  # "Decided and rejected".
   # - apiGroups: ["rbac.authorization.k8s.io"]
   #   resources: ["roles", "rolebindings"]
   #   verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
@@ -55,6 +66,11 @@ rules:
   # cert-manager (tenant-app Certificate CR when ingress.tls.clusterIssuer is set)
   - apiGroups: ["cert-manager.io"]
     resources: ["certificates"]
+    verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
+  # Prometheus Operator (tenant-app spec.parameters.monitoring) — without this every
+  # emitted ServiceMonitor/PodMonitor fails `forbidden` at reconcile with no other signal.
+  - apiGroups: ["monitoring.coreos.com"]
+    resources: ["servicemonitors", "podmonitors"]
     verbs: ["get", "list", "watch", "create", "update", "patch", "delete"]
 ---
 apiVersion: rbac.authorization.k8s.io/v1
