@@ -179,6 +179,12 @@ release-notes: ## Generate release-notes/<version>.md from template (usage: make
 .PHONY: release
 release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=major|minor|patch | default: auto from commits
 	@which git-cliff > /dev/null || (echo "git-cliff not installed — see https://git-cliff.org/docs/installation" && exit 1)
+	@echo ""
+	@echo "  ROADMAP.md, README.md, docs/, and release-notes/ get staged and"
+	@echo "  committed together with CHANGELOG.md below — go update whatever's"
+	@echo "  drifted before this runs, or right now in another terminal, since"
+	@echo "  nothing else in the tree may be dirty (see the check below)."
+	@echo ""
 	@if [ -n "$(VERSION)" ]; then \
 		ver="$(VERSION)"; \
 	elif [ -n "$(BUMP)" ]; then \
@@ -198,17 +204,19 @@ release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=m
 	fi; \
 	echo "$$ver" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
 		|| { echo "error: '$$ver' is not valid semver (expected vX.Y.Z)" >&2; exit 1; }; \
-	git diff --quiet && git diff --cached --quiet \
-		|| { echo "error: working tree has uncommitted changes — commit or stash before releasing" >&2; exit 1; }; \
+	dirty=$$(git status --porcelain -- . ':!ROADMAP.md' ':!README.md' ':!docs' ':!release-notes' ':!CHANGELOG.md'); \
+	[ -z "$$dirty" ] \
+		|| { echo "error: working tree has uncommitted changes outside ROADMAP.md/README.md/docs/release-notes/CHANGELOG.md — commit or stash before releasing:" >&2; echo "$$dirty" >&2; exit 1; }; \
 	git rev-parse "$$ver" >/dev/null 2>&1 \
 		&& { echo "error: tag $$ver already exists" >&2; exit 1; }; \
 	echo "→ checking CHANGELOG.md for $$ver"; \
 	git-cliff --tag "$$ver" -o CHANGELOG.md; \
-	if git diff --quiet -- CHANGELOG.md; then \
-		echo "→ CHANGELOG.md already up to date for $$ver"; \
+	git add CHANGELOG.md ROADMAP.md README.md docs/ release-notes/; \
+	if git diff --cached --quiet; then \
+		echo "→ nothing to commit for $$ver — CHANGELOG.md, ROADMAP.md, README.md, docs/, release-notes/ all already up to date"; \
 	else \
-		echo "→ CHANGELOG.md updated for $$ver"; \
-		git add CHANGELOG.md; \
+		echo "→ staged for $$ver:"; \
+		git diff --cached --name-only | sed 's/^/    /'; \
 		SKIP=no-commit-to-branch git commit -m "chore(release): prepare for release $$ver"; \
 	fi; \
 	echo "→ tagging $$ver"; \
