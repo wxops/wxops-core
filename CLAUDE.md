@@ -211,6 +211,23 @@ reconciles. Those need a cluster; a kind-based e2e tier is tracked in
 [`ROADMAP.md`](ROADMAP.md). A green `make test` means the compositions render
 what you expect and the API contract holds — not that it will work in-cluster.
 
+## Documentation Conventions
+
+Applies to prose paragraphs in `release-notes/`, `ROADMAP.md`, and `docs/` —
+markdown renders paragraphs as continuous regardless of source line breaks,
+so this is purely about the raw file being comfortable to read in an editor
+or terminal, not about rendered output.
+
+- **Wrap prose around ~100 characters per line, not ~78-80.** The tighter
+  wrap breaks lines too often and makes the source choppier to read than
+  necessary; a wider column reads more naturally without becoming a single
+  giant unwrapped line.
+- Applies to prose only — tables, code blocks, and list items keep their
+  natural length (a table row or a link-heavy bullet is often long regardless
+  of column target; don't force-wrap those).
+- When editing an existing doc, match this width for the paragraphs you
+  touch — no need to reflow an entire file just to fix one section.
+
 ## CI
 
 `.gitea/workflows/publish-packages.yaml` triggers on `v*` tag push, builds all packages in parallel, pushes versioned + `latest` tags, and auto-commits updated install files back to main.
