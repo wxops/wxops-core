@@ -10,8 +10,21 @@ This document covers what changes when the platform manages workloads across
 (workload clusters). It presents the full option space with trade-offs so either
 of two reference architectures can be adopted, rather than prescribing one path.
 
-**Nothing here is implemented.** This is a design document. No package, XRD, or
-`ProviderConfig` in this repository currently supports a second cluster.
+> **A path has since been chosen.** See
+> [`multi-cluster-proposal.md`](multi-cluster-proposal.md) for the concrete
+> proposal built on this research — Arch 2 + CAPI + structured authn, with
+> k8gb/ExternalDNS for multi-region routing. This document remains the
+> reference for the options *not* taken and the reasoning behind the choice.
+>
+> For how the hub→spoke API connection is secured in practice — including the
+> case this document assumes away, a spoke that **already exists** and whose
+> apiserver flags you do not control — see
+> [`multi-cluster-connectivity.md`](multi-cluster-connectivity.md).
+
+**Nothing here is implemented.** This is a design document. Since v0.4.0 the
+compositions do thread `spec.parameters.cluster` through every
+`providerConfigRef` (this doc's Phase 0 prerequisite), but no second cluster,
+spoke `ProviderConfig`, or credential exists.
 
 ---
 

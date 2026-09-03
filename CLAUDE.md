@@ -68,7 +68,11 @@ Package versions and XRD API versions are tracked in `VERSIONS.yaml`.
 - `kcl/<name>/` — KCL composition source (`kcl.mod`, `main.k`)
 - `examples/<name>/` — minimal XR YAML to exercise each package
 - `tests/cases/<name>/` — test cases; `tests/lib/` shared harness (see [Testing](#testing))
-- `docs/` — per-XRD `spec.parameters` API reference
+- `docs/` — per-XRD API reference **plus the architecture library**: start at
+  `docs/solution-matrix.md` (the map), then `multi-cluster{,-proposal,-scale}.md`,
+  `self-service-operations.md`, `knowledge-architecture.md`, `status-contract.md`,
+  `darlane.md`, `guardian.md`, `observability.md`. Check the matrix before
+  proposing work — it records what's shipped, designed, and rejected.
 - `release-notes/` — hand-written notes for significant releases (CI merges with git-cliff output)
 
 When adding new work, place it in the matching directory. Do not create new top-level folders.

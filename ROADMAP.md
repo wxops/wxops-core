@@ -45,7 +45,7 @@ everything that changes after that binding costs twice.
 
 | Area | State |
 |---|---|
-| 7 Configuration packages, `v0.3.4`, CI auto-publish on tag | ✅ |
+| 7 Configuration packages, `v0.4.0` (API-freeze release), CI auto-publish on tag | ✅ |
 | Darlane Tier 1 — `resources`, `securityContext`, `env`, `args` | ✅ |
 | Darlane Tier 2 safety — `productionOverride`, `ttl` + Kyverno policy | ✅ |
 | Darlane `fileSync` — including `initFromImage` | ✅ |
@@ -58,7 +58,7 @@ everything that changes after that binding costs twice.
 | **`darlane.rbac`** | ⛔ Dropped — RBAC belongs in the GitOps repo, not a composition |
 | API version `v1alpha1` → `v1beta1` | ✅ Decided — stay on `v1alpha1` through portal v1, promote at Phase 4 |
 | `spec.parameters.monitoring` (ServiceMonitor/PodMonitor) | ✅ Both kinds emit; `prometheus.io/*` annotations retired |
-| `targetCluster` threading | ✅ 29 sites across 3 KCL packages; not yet consumed (no spoke exists) |
+| `targetCluster` threading | ✅ 30 sites across 3 KCL packages (incl. the two monitor Objects); not yet consumed (no spoke exists) |
 | Offline test suite (golden + invariants + XRD conformance) | ✅ 19 cases, 18 rules, 9 negative cases — [`tests/README.md`](tests/README.md) |
 | Darlane `tunneling` (mirrord labels) | ⚪ Open, low value — the CLI works without it |
 
@@ -295,8 +295,8 @@ to make a stability commitment.
 ### 0.6 Thread `targetCluster` — ✅ done
 
 Replaced the hardcoded `providerConfigRef = {name = "default"}` in all three
-KCL packages — 29 sites total (`tenant-app` 12, `platform-database-clusters` 12,
-`tenant-database` 5) — with:
+KCL packages — 30 sites total (`tenant-app` 14, including the two monitoring
+Objects added in §0.7; `platform-database-clusters` 11; `tenant-database` 5) — with:
 
 ```python
 targetCluster = _get(params, "cluster", "default")
@@ -374,7 +374,7 @@ actually been `crossplane xpkg build`-validated by CI or pre-commit.
 - [x] ~~`darlane.rbac`~~ — dropped; XRD description corrected, GitOps seam documented
 - [x] API version decision recorded in `VERSIONS.yaml`
 - [x] `targetCluster` threaded through all KCL packages
-- [x] `monitoring` XRD block + ServiceMonitor/PodMonitor emission — see [0.7](#07-observability--servicemonitor-and-podmonitor--done)
+- [x] `monitoring` XRD block + ServiceMonitor/PodMonitor emission — see [0.7](#07-observability--servicemonitor-and-podmonitor---done)
 - [x] `monitoring.coreos.com` in provider RBAC; `tenant-app` added to `validate-packages.sh`
 - [x] `make kcl-sync && make kcl-check && make render && make lint` — and `make test` (didn't exist when this line was written; the offline test suite built afterward now covers all of the above with 19 golden cases + 18 invariants)
 - [x] One `VERSIONS.yaml` bump for the batch — done: `gitea-user/org/team` v0.1.1→v0.1.2, `gitea-repository` v0.1.0→v0.1.1, `platform-database-clusters`/`tenant-database` v0.1.4→v0.1.5, `tenant-app` v0.2.4→v0.2.5 (all relative to the last tag, `v0.3.4`). Not yet tagged/released — that's a release action, not a Phase 0 gap.
@@ -797,8 +797,17 @@ fields that do not exist, then rewriting it.
 In priority order, all post-portal:
 
 1. **`XDarlane` standalone XRD** — see [Where Darlane belongs](#where-darlane-belongs)
-2. **Multi-cluster Phase 0/1** from [`multi-cluster.md`](docs/multi-cluster.md#migration-path)
+2. **Multi-cluster prototype** — now fully specified in
+   [`multi-cluster-proposal.md`](docs/multi-cluster-proposal.md) (CAPI + one spoke +
+   scoped `ProviderConfig` + structured authn, with exit criteria); the v0.4.0
+   `cluster` threading is its completed prerequisite. The connection-security
+   options for item 4, and the answer for spokes CAPI did not provision, are in
+   [`multi-cluster-connectivity.md`](docs/multi-cluster-connectivity.md)
 3. **Guardian Phase 1** — [`guardian.md`](docs/guardian.md)
+4. **Self-service operations track** — sequenced in
+   [`self-service-operations.md`](docs/self-service-operations.md#what-to-build--sequenced)
+   and [`knowledge-architecture.md`](docs/knowledge-architecture.md#adoption--sequenced-each-step-useful-alone);
+   the small core pieces live in the Backlog below
 
 Unscheduled ideas live in the [Backlog](#backlog); closed ones in
 [Decided and rejected](#decided-and-rejected).
@@ -836,7 +845,8 @@ platform team.
       reservation (§6). `NOTICE` added for §4(d) attribution.
 - [x] `CONTRIBUTING.md` — conventional commits, `make kcl-sync` requirement,
       `VERSIONS.yaml` bump policy, pre-commit setup, the Python venv step
-- [ ] `SECURITY.md` with a disclosure address
+- [ ] `SECURITY.md` with a disclosure address — the content basis now exists
+      in [`docs/security-threat-model.md`](docs/security-threat-model.md)
 - [ ] `CODE_OF_CONDUCT.md`
 - [x] Decide the public registry and make `Makefile` and `package/install/`
       agree on it — **`ghcr.io/wxops`**
@@ -875,6 +885,32 @@ platform team.
 release. Items graduate into a phase when a concrete need appears — they are not
 worked through in order, and an item sitting here for a year is a normal outcome,
 not a slipped deadline.
+
+### Core follow-ups from the architecture docs (2026-08)
+
+Safe-tier, additive package changes argued in the docs family — see
+[`docs/solution-matrix.md`](docs/solution-matrix.md) for the full picture:
+
+- [ ] **`status.notReady` reasons** on all seven packages — the composition
+      already computes per-resource readiness and discards it; exposing it is
+      the cheapest, highest-leverage diagnostics change
+      ([self-service-operations.md](docs/self-service-operations.md#whats-missing))
+- [ ] **`scheduling:` block** (`nodeSelector`, `tolerations`, spread) on
+      `tenant-app` + `platform-database-clusters` — verified gap; prerequisite
+      for any arm64/edge/GPU node pool
+      ([multi-cluster-scale.md](docs/multi-cluster-scale.md#the-verified-wxops-gaps))
+- [ ] **Widen `resources.requests/limits`** to accept extended-resource keys
+      (`nvidia.com/gpu`) — today's schema silently prunes them despite the
+      "passed through verbatim" description (same doc)
+- [ ] **`monitoring.alerts`** — `PrometheusRule` emission with `runbook_url`,
+      same pattern/tier as the monitor emission; needs `prometheusrules` in
+      provider RBAC
+      ([self-service-operations.md](docs/self-service-operations.md#pillar-2--runbooks-as-platform-contract))
+- [ ] **`ingress.gslb` block** — blocked on the k8gb↔Traefik-IngressRoute
+      spike; do the spike first
+      ([multi-cluster-scale.md](docs/multi-cluster-scale.md#gslb-implementations--three-options-one-field-tested))
+- [ ] **Runbooks + `docs/incidents/` convention** — knowledge-architecture
+      adoption steps 2–3; docs-only, no code
 
 ### Vault Database Secrets Engine
 
@@ -976,7 +1012,7 @@ Release history. Legend: `[ ]` open · `[~]` in progress · `[x]` shipped · `[-
 - [x] `darlane.productionOverride` + `darlane.ttl` — double opt-in gate for prod; Kyverno `ClusterCleanupPolicy` auto-scales down expired pods
 - [ ] ~~`darlane.rbac` — scoped `Role`/`RoleBinding` for developer access to the darlane Deployment only~~
       **Corrected 2026-08-14: never implemented.** No `rbac` block exists in `package/tenant-app/xrd.yaml`
-      or `kcl/tenant-app/main.k`. Tracked as [Phase 0 item 0.4](#04-implement-darlanerbac).
+      or `kcl/tenant-app/main.k`. Tracked as [Phase 0 item 0.4](#04-implement-darlanerbac--dropped).
 - [x] `darlane.serviceAccount` — dedicated SA with optional workload identity annotations
 - [x] `volumes[]` and `darlane.volumes[]` expanded: `configMapName` and `secretName` sources alongside `claimName` (PVC); optional `items[]` key-to-path projections
 - [x] provider-kubernetes RBAC: added `traefik.io` (IngressRoute, TraefikService) and `cert-manager.io` (Certificate) rules; retained `networking.k8s.io/ingresses` for migration
@@ -1043,6 +1079,8 @@ enforces.
 ## References
 
 - [`docs/multi-cluster.md`](docs/multi-cluster.md) — hub-spoke architecture and options
+- [`docs/multi-cluster-connectivity.md`](docs/multi-cluster-connectivity.md) — securing the
+  hub→spoke API connection, for new and pre-existing clusters
 - [`docs/darlane.md`](docs/darlane.md) — Darlane workflows and the `XDarlane` vision
 - [`docs/guardian.md`](docs/guardian.md) — Guardian Framework design
 - [`docs/tenant-app.md`](docs/tenant-app.md) — `XTenantApp` API reference

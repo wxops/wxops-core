@@ -12,7 +12,7 @@ your application needs, scaled to zero at rest.
 ---
 
 **Table of Contents**
-- [Darlane — In-Cluster Developer Environment](#darlane--in-cluster-developer-lane)
+- [Darlane — In-Cluster Developer Environment](#darlane--in-cluster-developer-environment)
   - [Why this is different](#why-this-is-different)
   - [Darlane vs. `kubectl debug` / ephemeral containers](#darlane-vs-kubectl-debug--ephemeral-containers)
     - [What `kubectl debug` actually does](#what-kubectl-debug-actually-does)
