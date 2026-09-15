@@ -14,8 +14,10 @@
 #               3. Kubernetes schema   (kubeconform)
 #               4. Crossplane build    (crossplane xpkg build)
 #               5. KCL drift check     (composition.yaml vs kcl/ source)
-#               6. Package version bump (VERSIONS.yaml check)
+#               6. Package pins        (VERSIONS.yaml vs package/install/)
 #               7. README packages     (README.md table vs VERSIONS.yaml)
+#               8. Tests               (XRD conformance, API compatibility, invariants)
+#   pre-push    9. Golden render tests
 #
 # Allowed commit types (must stay in sync with cliff.toml commit_parsers):
 #   feat | fix | perf | refactor | docs | test | chore | revert
@@ -106,6 +108,7 @@ repos:
             \.github/.*|
             \.gitlab/.*|
             VERSIONS\.yaml|
+            tests/api-compat-allow\.yaml|
             CHANGELOG\.md|
             .pre-commit-config\.yaml|
             .yamllint\.yaml
@@ -137,25 +140,25 @@ repos:
         pass_filenames: false
         files: ^(kcl/|package/(platform-database-clusters|tenant-database|tenant-app)/composition\.yaml)
 
-  # ── Package version bump enforcement ─────────────────────────────────────────
-  # Ensures VERSIONS.yaml carries a bumped version for every package whose YAML
-  # files are staged. Reads VERSIONS.yaml from the index so the developer can
-  # include the bump in the same commit as the package change.
-  # NOTE: When adding a new package, you can add another after `|` in the regex, e.g: `| postgresql-cluster | redis-cluster | `.
+  # ── Package pins ─────────────────────────────────────────────────────────────
+  # VERSIONS.yaml `current` and package/install/*.yaml are written together by
+  # `make release` and must agree. There is no version to bump by hand: a
+  # release is named by date, and compatibility is guarded by test-api-compat.
   - repo: local
     hooks:
-      - id: versions-bump-check
-        name: ensure VERSIONS.yaml is bumped for changed packages
-        language: script
-        entry: .gitea/scripts/check-versions-bump.sh
+      - id: release-state-check
+        name: package/install pins agree with VERSIONS.yaml
+        language: python
+        additional_dependencies: [pyyaml]
+        entry: python3 .gitea/scripts/release-state.py check
         pass_filenames: false
-        files: ^package/(gitea-user|gitea-org|gitea-team|gitea-repository|platform-database-clusters|tenant-database|tenant-app)/.*\.yaml$
+        files: ^(VERSIONS\.yaml|package/install/)
 
   # ── README packages table sync ────────────────────────────────────────────────
-  # Runs after versions-bump-check so the table always reflects a version that
-  # has already been confirmed as bumped.
-  # If you add a package, bump a version, or add an API version, run
-  # `make readme-sync` before committing.
+  # Runs after release-state-check so the table always reflects pins that
+  # already agree with package/install/.
+  # If you add a package or an API version, run `make readme-sync` before
+  # committing.
   - repo: local
     hooks:
       - id: readme-packages-table
@@ -188,6 +191,16 @@ repos:
         entry: python3 tests/invariants.py
         pass_filenames: false
         files: ^(tests/|kcl/|package/[^/]+/composition\.yaml)
+
+      # Diffs against the last release tag through git — no Docker, well under
+      # a second. Fails on a breaking change to an already-released XRD.
+      - id: test-api-compat
+        name: released API stays additive (vs last release tag)
+        language: python
+        additional_dependencies: [pyyaml, jsonschema]
+        entry: python3 tests/api_compat.py
+        pass_filenames: false
+        files: ^(package/[^/]+/xrd\.yaml|tests/)
 
       - id: test-golden
         name: golden render tests (slow — push only)

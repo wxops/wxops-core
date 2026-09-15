@@ -1,11 +1,41 @@
 # W'xOps Core
 
-Control-plane "brain" of W'xOps. Exposes Gitea management, PostgreSQL database provisioning, and tenant application scaffolding (with Darlane in-cluster developer workspaces) as Kubernetes-native platform APIs via [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages backed by `provider-terraform`, `provider-kubernetes`, and `function-kcl`.
+***"Ask Kubernetes for a Gitea user, a PostgreSQL database, or a full application deployment — get a real one back."***
+
+> [!NOTE]
+> W'xOps Core is a library of [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages: each one defines a schema (an `XRD`) and the logic that turns it into real infrastructure (a `Composition`), so `kubectl apply -f my-app.yaml` provisions a Gitea account, a CloudNativePG database, or a Deployment/Service/IngressRoute stack — no custom controller, no platform UI required to use it.
+
+## The problem this solves
+
+Standing up a new tenant app or database today usually means: click through Gitea's UI to create a repo, hand-write Terraform for the database, copy-paste a Deployment Service/Ingress from the last app that looked similar, and wire the secrets together by hand. Every step is a manual, undocumented, tribal-knowledge operation.
+
+W'xOps Core turns each of those into a Kubernetes object with a schema: `XGiteaUser`, `XTenantDatabase`, `XTenantApp`, and four more. Crossplane reconciles them the same way it reconciles anything else — continuously, declaratively, with `status` fields you can poll instead of watching a Terraform apply scroll by. What actually executes underneath (Terraform against a Gitea provider, or Kubernetes objects composed via KCL) is an implementation detail the schema hides.
+
+This repo is **only the Configuration packages** — the schemas and the composition logic. It has no UI, no CLI, and no build pipeline; **see [Out of scope](ROADMAP.md#out-of-scope--what-wxops-core-is-not) for the deliberate boundary.**
+
+---
+**Table of Contents**
+
+- [W'xOps Core](#wxops-core)
+  - [The problem this solves](#the-problem-this-solves)
+  - [Packages](#packages)
+  - [Documentation](#documentation)
+  - [Why Crossplane + Terraform](#why-crossplane--terraform)
+  - [Repository layout](#repository-layout)
+  - [Quick start](#quick-start)
+  - [Development](#development)
+  - [KCL composition functions](#kcl-composition-functions)
+  - [Versioning and releases](#versioning-and-releases)
+  - [Reference stack](#reference-stack)
+  - [Contributing](#contributing)
+  - [License](#license)
+
+---
 
 ## Packages
 
 <!-- packages-table-start -->
-| Package | Kind | Group | API Versions | Package Version |
+| Package | Kind | Group | API Versions | Last changed in |
 |---|---|---|---|---|
 | [`gitea-user`](package/gitea-user/) | `XGiteaUser` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.2` |
 | [`gitea-org`](package/gitea-org/) | `XGiteaOrg` | `platform.wxops.cloud` | `v1alpha1` | `v0.1.2` |
@@ -16,13 +46,31 @@ Control-plane "brain" of W'xOps. Exposes Gitea management, PostgreSQL database p
 | [`tenant-app`](package/tenant-app/) | `XTenantApp` | `platform.wxops.cloud` | `v1alpha1` | `v0.2.5` |
 <!-- packages-table-end -->
 
-> `random-password` lives in `package/random-password/` as a utility composition but is not yet published as a standalone OCI package.
+> [!TIP]
+> `random-password` lives in `package/random-password/` as a utility composition and examples, and it will not published as OCI Artifact.
 
-Current package versions and XRD API version history are tracked in [`VERSIONS.yaml`](VERSIONS.yaml). Full `spec.parameters` reference for every XRD lives in [`docs/`](docs/).
+Served XRD API versions, and the release each package last changed in, are tracked in [`VERSIONS.yaml`](VERSIONS.yaml). Releases are named by date — `release-YYYY-MM-DD` — and compatibility is the API version, not the release name; see [`docs/development/releasing.md`](docs/development/releasing.md).
+
+---
+
+## Documentation
+
+Everything is linked from one hub, [`docs/README.md`](docs/README.md), which also holds the **development matrix**: every package, core idea and delivery mechanism, where it stands, and what is next.
+
+| Section | For | Start with |
+|---|---|---|
+| [API reference](docs/api-reference/README.md) | What each Kind accepts, what Core composes and keeps reconciled, what it reports | The reconcile loop from your side, then one page per Kind |
+| [Core ideas](docs/README.md#core-ideas) | Darlane, Guardian, multi-cluster, observability, self-service operations, security | [Solution matrix](docs/core-ideas/solution-matrix.md) |
+| [User guide](docs/README.md#user-guide) | Installing Core and building on it | [Setup](docs/user-guide/setup.md) · [App onboarding](docs/user-guide/app-onboarding.md) |
+| [Development](docs/development/README.md) | Changing, testing, releasing and rolling out Core | [Development guide](docs/development/README.md) · [Releasing](docs/development/releasing.md) |
 
 ---
 
 ## Why Crossplane + Terraform
+
+![W'xOps Core on Crossplane — the runtime (RBAC manager), the definitions layer (Providers, Functions and Configurations composing into XRDs and Compositions), and a composite resource fanning out to real Kubernetes, database and cloud resources](images/w'xops-core-crossplane.png)
+
+The shape above is what every package in this repo is an instance of — a `Configuration` package contributing an `XRD` + `Composition`, which a `CompositeResourceDefinition` turns into a composite resource (XR) that Crossplane creates and reconciles against real infrastructure. It's a structural map, not a substitute for [Crossplane's own docs](https://docs.crossplane.io/v2.3/) — read those for what each piece actually does.
 
 The previous direction used `kubebuilder` to build a controller from scratch. That was **rejected** — too much complexity for the problem.
 
@@ -50,7 +98,7 @@ package/                      ← Crossplane Configuration packages
   gitea-repository/
   random-password/            ← utility composition, no package metadata yet
   install/                    ← Production install: OCI registry-based (pkg.crossplane.io/v1)
-    gitea-user.yaml           ← Configuration resource; spec.package auto-bumped by CI
+    gitea-user.yaml           ← Configuration resource; spec.package pinned by `make release`
     gitea-org.yaml
     gitea-team.yaml
     gitea-repository.yaml
@@ -60,7 +108,11 @@ package/                      ← Crossplane Configuration packages
                               ← kubectl apply -k package/dev/
   kustomization.yaml          ← delegates to install/ (kubectl apply -k package/)
 providers/                    ← shared Provider + Function installs + ProviderConfig
-docs/                         ← API reference (spec.parameters) per XRD
+docs/                         ← documentation hub + development matrix (docs/README.md)
+  api-reference/              ← the reconcile loop, one page per Kind, the status contract
+  core-ideas/                 ← Darlane, Guardian, multi-cluster, observability, self-service, security
+  user-guide/                 ← setup, app onboarding, portal integration
+  development/                ← development guide, releasing
 examples/                     ← minimal XR YAML to exercise each package
   gitea-user/
     credentials-secret.yaml
@@ -83,130 +135,39 @@ kcl/                          ← KCL composition functions (source of truth, em
   tenant-app/
     kcl.mod
     main.k
-.gitea/workflows/
-  publish-packages.yaml       ← CI: build + push on v* tag, auto-bump package/install/
+.github/workflows/
+  publish-packages.yaml       ← CI: build + push changed packages on a release-* tag
+  pr-validate.yaml            ← merge gate (mirrored in .gitea/workflows/ while PRs merge on Gitea)
+tests/                        ← offline suite: XRD conformance, API compat, golden, invariants
+release-notes/                ← hand-written notes; required for careful/breaking releases
 ```
 
 ---
 
-## Getting started
-
-### Prerequisites
-
-- [`crossplane` CLI](https://docs.crossplane.io/latest/cli/) ≥ v2.3
-- `kubectl` pointed at a cluster with Crossplane v2.3+ installed
-- `pre-commit` (optional, for local development)
-
-### 1 — Install providers once per cluster
+## Quick start
 
 ```bash
-make providers
-```
-
-This applies everything in `providers/`: `provider-terraform`, `provider-kubernetes` (+ RBAC and `ProviderConfig`), `provider-sql`, `function-patch-and-transform`, `function-go-templating`, `function-kcl`, `function-extra-resources`, and the Terraform `ProviderConfig`.
-
->[!NOTE]
-> `make providers` is required before `make install`.** Crossplane's
-> `dependsOn` in `crossplane.yaml` can auto-install missing dependencies, but
-> auto-installed resources get long names derived from the OCI path (e.g.
-> `crossplane-contrib-function-kcl` instead of `function-kcl`). Compositions
-> reference the short names set by `providers/*.yaml`, so auto-installed
-> dependencies will not be found. Additionally, providers like
-> `provider-kubernetes` need a `RuntimeConfig`, RBAC `ClusterRoleBinding`, and
-> `ProviderConfig` — none of which `dependsOn` can provide. The `dependsOn`
-> section serves as a **version constraint safety net**, not an installer.
-
-### 2 — Create a credentials secret
-
-All packages use the same secret format:
-
-```bash
+make providers                                            # once per cluster
 kubectl create secret generic gitea-credentials \
-  --from-literal=credentials='gitea_token = "your-admin-token"' \
-  -n crossplane-system
-```
-
-For `gitea-user`, append a `password` field:
-
-```bash
-kubectl create secret generic gitea-credentials \
-  --from-literal=credentials=$'gitea_token = "your-admin-token"\npassword = "initial-password"' \
-  -n crossplane-system
-```
-
-### 3 — Install packages
-
-**Production** (pulls from OCI registry):
-
-```bash
-make install
-```
-
-**Development** (applies XRDs + Compositions directly, no registry):
-
-```bash
-make install-dev
-```
-
-### 4 — Apply an example claim
-
-```bash
+  --from-literal=credentials='gitea_token = "your-admin-token"' -n crossplane-system
+make install                                              # packages from the OCI registry
 kubectl apply -f examples/gitea-user/xr.yaml
 kubectl get xgiteausers
-kubectl describe xgiteauser <name>
 ```
+
+Prerequisites, the platform dependencies each package needs, credential formats and uninstalling are in the [setup guide](docs/user-guide/setup.md). What each resource does once it exists is in the [API reference](docs/api-reference/README.md).
 
 ---
 
 ## Development
 
-### Pre-commit hooks
-
-Install once:
-
 ```bash
-pip install pre-commit
-pre-commit install
+pre-commit install --install-hooks
+pre-commit install --hook-type pre-push --hook-type commit-msg
+make test-deps && make test        # the offline merge gate — no cluster needed
 ```
 
-On every `git commit`, hooks run:
-
-| Hook | Tool | What it checks |
-|---|---|---|
-| YAML syntax | `check-yaml` | All `.yaml`/`.yml` files parse cleanly |
-| YAML style | `yamllint` | Line length, indentation, key ordering |
-| Kubernetes schema | `kubeconform` | XRDs, Compositions, providers match API schemas |
-| Package render | `crossplane xpkg build` | All four packages build without errors |
-
-Run all hooks manually without committing:
-
-```bash
-pre-commit run --all-files
-```
-
-Run only the Crossplane build validation:
-
-```bash
-pre-commit run crossplane-validate --all-files
-```
-
-### Make targets
-
-```
-make build         Build all OCI packages locally (.xpkg artifacts)
-make push          Build + push to registry  (set REGISTRY= and VERSION=)
-make validate      Validate package structure (crossplane xpkg build, no push)
-make lint          YAML lint + kubeconform
-make render        Render example XRs against compositions (offline dry-run)
-make providers     Install shared providers/functions on cluster
-make install       Install packages from OCI registry
-make install-dev   Apply XRDs + Compositions directly (no registry)
-make uninstall     Remove registry-installed packages
-make uninstall-dev Remove dev-applied XRDs + Compositions
-make changelog     Generate CHANGELOG.md from git log (requires git-cliff)
-make clean         Remove .xpkg build artifacts
-make help          Show all targets
-```
+Every hook, every make target and the rules that bite are in the [development guide](docs/development/README.md); the change loop and the new-package checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
@@ -220,53 +181,16 @@ See [`kcl/README.md`](kcl/README.md) for why KCL vs Go templating, the sync work
 
 ---
 
-## Versioning
+## Versioning and releases
 
-Two independent versioning axes exist in this project:
-
-| Axis | Example | Tracked in | When it changes |
-|---|---|---|---|
-| **Package version** | `v0.2.0` | `configuration.yaml` → `spec.package` | On every git tag push; CI auto-bumps |
-| **XRD API version** | `v1alpha1` | `xrd.yaml` → `spec.versions[].name` | When a schema version is added or deprecated |
-
-Both axes are summarised in [`VERSIONS.yaml`](VERSIONS.yaml).
-
-### XRD versioning rules
-
-- **Never remove** a `served: true` version — that is a breaking change for cluster consumers.
-- **Adding** a new version (e.g. `v1alpha1` → `v1beta1`) requires a `conversion` strategy in the XRD and should bump the package **minor** version.
-- **Schema changes within a version** that are backward-compatible (adding optional fields) can ship as a **patch** release.
-- **Removing required fields or changing field types** is a breaking change — add a new API version instead.
-
-### Releasing a new package version
+Two axes, never mixed: the **XRD API version** (`platform.wxops.cloud/v1alpha1`) is the contract that dev XRs, prod XRs and the portal bind to, and it only ever grows once released; the **release** (`release-YYYY-MM-DD`) is a dated snapshot of the packages that changed.
 
 ```bash
-git tag v0.2.0
-git push origin v0.2.0
+make release           # gate → pin changed packages → CHANGELOG.md → commit + tag release-YYYY-MM-DD
+git push origin main && git push origin release-YYYY-MM-DD
 ```
 
-CI (`.gitea/workflows/publish-packages.yaml`) will:
-1. Build all four packages in parallel.
-2. Push `<image>:v0.2.0` and `<image>:latest` to the registry.
-3. Auto-commit updated `configuration.yaml` files with the new `spec.package` image back to `main`.
-
-### Changelog
-
-Generated from [Conventional Commits](https://www.conventionalcommits.org/) via [`git-cliff`](https://git-cliff.org/):
-
-```bash
-make changelog        # regenerate CHANGELOG.md
-make changelog-preview  # print to stdout, don't write file
-```
-
-Use package names as scopes to keep per-package history readable:
-
-```
-feat(gitea-team): add includeAllRepositories field to XRD v1alpha1
-fix(gitea-user): correct must_change_password terraform variable default
-feat(gitea-repository)!: promote schema to v1beta1 — breaking field rename
-chore(ci): pin crossplane CLI to v2.3.1 in publish workflow
-```
+The API rule, release notes, what CI publishes and the changelog are in [Releasing](docs/development/releasing.md).
 
 ---
 
@@ -293,12 +217,12 @@ Every change is gated by an offline test suite — no cluster required:
 
 ```bash
 make test-deps    # once
-make test         # XRD conformance + golden render tests + invariants
+make test         # XRD conformance + API compat + golden render tests + invariants
 ```
 
-`crossplane composition render` runs the real function images in Docker, so the
-unit under test is the composition itself. See [tests/README.md](tests/README.md)
-for what that covers and, importantly, what it does not.
+`crossplane composition render` runs the real function images in Docker, so the unit under test is the composition itself. See [tests/README.md](tests/README.md) for what that covers and, importantly, what it does not.
+
+This project has a [Code of Conduct](CODE_OF_CONDUCT.md). Found a vulnerability? See [SECURITY.md](SECURITY.md) for how to report it privately.
 
 ---
 
@@ -322,6 +246,4 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-Third-party components composed by this project are listed in [`NOTICE`](NOTICE),
-which redistributors must preserve under Section 4(d) of the License. The W'xOps
-name and marks are not granted by the License — see Section 6.
+Third-party components composed by this project are listed in [`NOTICE`](NOTICE), which redistributors must preserve under Section 4(d) of the License. The W'xOps name and marks are not granted by the License — see Section 6.

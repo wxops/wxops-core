@@ -1,10 +1,10 @@
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: platform-wxops-tenant-database
+  name: wxops-core-tenant-database
   annotations:
     meta.crossplane.io/version: v0.1.0
 spec:
-  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-tenant-database:v0.1.5
+  package: gitea.xeusnguyen.xyz/platform-team/wxops-core-tenant-database:v0.1.5
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic

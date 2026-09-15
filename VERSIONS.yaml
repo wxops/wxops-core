@@ -1,27 +1,38 @@
-# VERSIONS.yaml — single source of truth for package and XRD API versions.
+# VERSIONS.yaml — the XRD API versions each package serves, and the release each
+# package last changed in.
 #
-# Two axes:
-#   package  — OCI image version in the registry (bumped on every git tag)
-#   api      — Kubernetes XRD API version(s) served by this package
+# Two axes, never mixed:
 #
-# Rules:
-#   • Never remove an entry from api.served — that is a breaking change.
-#   • Adding a new api.served version → bump package minor (x.Y.0).
-#   • Schema change within a version (backward-compat) → bump package patch (x.y.Z).
-#   • Breaking schema change → add a new api version first, then bump package major.
+#   api      — the Kubernetes API version the XRD serves (platform.wxops.cloud/v1alpha1).
+#              This is the contract: dev XRs, prod XRs and the portal all bind to it.
+#              Edited by hand, and rarely.
+#   package  — `current` is the release (release-YYYY-MM-DD[.N]) in which the package's
+#              content last changed: the OCI tag package/install/ pins. Written by
+#              `make release`, never by hand. Legacy vX.Y.Z values stay until the
+#              package next changes; `unreleased` marks a package that never shipped.
 #
-# Updated automatically by CI on tag push (package.current).
-# Updated manually when XRD spec.versions changes (api.*).
+# API rules — a released XRD is additive-only:
+#   • Adding optional fields, status fields or whole new objects is always fine.
+#   • Never remove or retype a field, make a field required on an existing object,
+#     narrow an enum or bound, or rename a composed resource.
+#   • A new API version is NOT a way around that. Crossplane: "the schema of each
+#     version can't change any existing fields", and breaking changes between
+#     versions need conversion webhooks — a custom server, which this repo's
+#     no-controllers rule excludes. A breaking need becomes a new field beside
+#     the old one, or a new Kind.
+#     https://docs.crossplane.io/latest/composition/composite-resource-definitions/
+#   • tests/api_compat.py enforces all of this against the last release tag.
+#
+# Date-named OCI tags are not semver, so a Crossplane `dependsOn` version range
+# cannot target these packages; pin an exact tag or digest if one ever must.
 #
 # API version decision (ROADMAP.md Phase 0 §0.5, decided): all seven XRDs stay
 # on v1alpha1 through the portal's first integration. Every Phase 0 change
-# (status parity, monitoring, targetCluster, darlane status) is purely
-# additive, so nothing forces a bump — dual-serving now would duplicate the
-# full schema per XRD (500+ lines for tenant-app alone) for no present benefit.
-# Promote to v1beta1 as part of Phase 4 (OSS release), the natural point to
-# make a stability commitment. Portal v1 pinning an alpha API is acceptable
-# while portal and core ship together. See docs/status-contract.md for the
-# current per-package status field contract the portal binds to today.
+# (status parity, monitoring, targetCluster, darlane status) was purely
+# additive, so nothing forced a bump. Promotion to v1beta1 at release readiness
+# (ROADMAP.md's OSS-release section) is a stability commitment over an identical
+# schema — per the rule above, not a schema change. The portal pins the API version, never a core
+# release. See docs/api-reference/status-contract.md for the status fields it binds to.
 
 packages:
 

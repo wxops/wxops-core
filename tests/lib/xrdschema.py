@@ -33,14 +33,20 @@ ROOT = Path(__file__).resolve().parents[2]
 def load(package: str, version: str | None = None) -> tuple[str, dict]:
     """Return (version_name, openAPIV3Schema) for a package's XRD."""
     doc = yaml.safe_load((ROOT / "package" / package / "xrd.yaml").read_text())
-    versions = (doc.get("spec") or {}).get("versions") or []
+    return load_doc(doc, version, label=package)
+
+
+def load_doc(doc: dict, version: str | None = None,
+             label: str = "XRD") -> tuple[str, dict]:
+    """load() for an XRD that is already parsed — e.g. read at a release tag."""
+    versions = ((doc or {}).get("spec") or {}).get("versions") or []
     if not versions:
-        raise ValueError(f"{package}: XRD has no spec.versions")
+        raise ValueError(f"{label}: XRD has no spec.versions")
     v = versions[0]
     if version:
         v = next((x for x in versions if x.get("name") == version), None)
         if v is None:
-            raise ValueError(f"{package}: no version {version}")
+            raise ValueError(f"{label}: no version {version}")
     return v["name"], v["schema"]["openAPIV3Schema"]
 
 

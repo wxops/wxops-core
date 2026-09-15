@@ -1,11 +1,11 @@
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: platform-wxops-gitea-repository
+  name: wxops-core-gitea-repository
   annotations:
     meta.crossplane.io/version: v0.1.0
 spec:
-  package: gitea.xeusnguyen.xyz/platform-team/platform-wxops-gitea-repository:v0.1.1
+  package: gitea.xeusnguyen.xyz/platform-team/wxops-core-gitea-repository:v0.1.1
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic
 

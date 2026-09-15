@@ -1,11 +1,15 @@
 # cliff.toml — git-cliff configuration for W'xOps Core
 #
 # Usage:
-#   git-cliff -o CHANGELOG.md          # write to file
-#   git-cliff                          # print to stdout (preview)
-#   git-cliff --tag v0.2.0             # preview changelog for a new tag
+#   git-cliff -o CHANGELOG.md                  # write to file
+#   git-cliff                                  # print to stdout (preview)
+#   git-cliff --tag release-2026-09-11         # preview changelog for a new release
 #
 # Install: cargo install git-cliff   OR   pip install git-cliff
+#
+# Releases are named release-YYYY-MM-DD[.N]. Releases before that switch kept
+# their semver tags (v0.1.0 … v0.4.0); tag_pattern accepts both so the history
+# is never dropped, and the series-diff block below only applies to semver pairs.
 
 [changelog]
 header = """
@@ -14,8 +18,12 @@ header = """
 All notable changes to W'xOps Core packages are documented here.
 
 Format follows [Keep a Changelog](https://keepachangelog.com/en/1.1.0/).
-Versioning follows [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 Commit messages follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/).
+
+> **Releases are named by date** — `release-YYYY-MM-DD` — from the first release after `v0.4.0`.
+> A release name says *when*, not what is compatible. Compatibility is the XRD API version
+> (`platform.wxops.cloud/v1alpha1`), held additive-only by `tests/api_compat.py`. See
+> [`release-notes/README.md`](release-notes/README.md).
 
 > This file is regenerated from git history by running `make changelog`.
 > Do not edit it manually.
@@ -38,25 +46,29 @@ body = """
 ### {{ group | upper_first }}
 
 {% for commit in commits %}\
-- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | upper_first }}{% if commit.breaking %} ⚠️ **BREAKING**{% endif %} ([`{{ commit.id | truncate(length=7, end="") }}`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/commit/{{ commit.id }}))
+- {% if commit.scope %}**{{ commit.scope }}**: {% endif %}{{ commit.message | upper_first }}{% if commit.breaking %} ⚠️ **BREAKING**{% endif %} ([`{{ commit.id | truncate(length=7, end="") }}`](https://github.com/wxops/wxops-core/commit/{{ commit.id }}))
 {% endfor %}
 {% endfor %}
 {% if version %}
-📖 [API reference](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/docs) · [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/VERSIONS.yaml)
+📖 [API reference](https://github.com/wxops/wxops-core/tree/{{ version }}/docs) · [`VERSIONS.yaml`](https://github.com/wxops/wxops-core/blob/{{ version }}/VERSIONS.yaml)
 {% if previous and previous.version %}\
+{% if version is starting_with("v") and previous.version is starting_with("v") %}\
 {% set cur = version | trim_start_matches(pat="v") | split(pat=".") %}\
 {% set prev = previous.version | trim_start_matches(pat="v") | split(pat=".") %}\
 {% if cur.0 != prev.0 or cur.1 != prev.1 %}\
 {% set prev_series_base = "v" ~ prev.0 ~ "." ~ prev.1 ~ ".0" %}\
-🔍 [Full series diff ({{ prev_series_base }} → {{ version }})](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ prev_series_base }}...{{ version }})
+🔍 [Full series diff ({{ prev_series_base }} → {{ version }})](https://github.com/wxops/wxops-core/compare/{{ prev_series_base }}...{{ version }})
 
 > ⚠️ **Major/minor version bump** — this diff covers the entire **{{ prev.0 }}.{{ prev.1 }}.x**
 > patch series ({{ prev_series_base }} through {{ previous.version }}) so no intermediate patch is missed.
-> Check [`VERSIONS.yaml`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/VERSIONS.yaml)
-> for affected packages and [`docs/`](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/src/tag/{{ version }}/docs)
+> Check [`VERSIONS.yaml`](https://github.com/wxops/wxops-core/blob/{{ version }}/VERSIONS.yaml)
+> for affected packages and [`docs/`](https://github.com/wxops/wxops-core/tree/{{ version }}/docs)
 > for schema changes.
 {% else %}\
-🔍 [Diff vs {{ previous.version | trim_start_matches(pat="v") }}](https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ previous.version }}...{{ version }})
+🔍 [Diff vs {{ previous.version | trim_start_matches(pat="v") }}](https://github.com/wxops/wxops-core/compare/{{ previous.version }}...{{ version }})
+{% endif %}\
+{% else %}\
+🔍 [Diff vs {{ previous.version | trim_start_matches(pat="v") }}](https://github.com/wxops/wxops-core/compare/{{ previous.version }}...{{ version }})
 {% endif %}\
 {% endif %}\
 {% endif %}\
@@ -67,12 +79,12 @@ footer = """
 {% for release in releases %}\
 {% if release.version %}\
 [{{ release.version | trim_start_matches(pat="v") }}]: \
-https://gitea.xeusnguyen.xyz/platform-team/wxops-core/releases/tag/{{ release.version }}
+https://github.com/wxops/wxops-core/releases/tag/{{ release.version }}
 {% endif %}\
 {% endfor %}\
 {% set latest = releases | filter(attribute="version") | first %}\
 {% if latest %}\
-[Unreleased]: https://gitea.xeusnguyen.xyz/platform-team/wxops-core/compare/{{ latest.version }}...HEAD
+[Unreleased]: https://github.com/wxops/wxops-core/compare/{{ latest.version }}...HEAD
 {% endif %}\
 """
 
@@ -106,7 +118,8 @@ commit_parsers = [
 #               random-password, ci, providers, docs
 protect_breaking_commits = true
 filter_commits = false
-tag_pattern = "v[0-9].*"
+# Literal string: a TOML basic string would reject the `\.` escapes.
+tag_pattern = '^(v[0-9]+\.[0-9]+\.[0-9]+|release-[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?)$'
 skip_tags = ""
 ignore_tags = ""
 topo_order = false

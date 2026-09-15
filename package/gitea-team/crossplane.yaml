@@ -1,7 +1,7 @@
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: platform-wxops-gitea-team
+  name: wxops-core-gitea-team
   annotations:
     meta.crossplane.io/maintainer: W'xOps Platform Team
     meta.crossplane.io/description: Manages a Gitea team and its membership within an organization via Crossplane.

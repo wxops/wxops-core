@@ -16,17 +16,17 @@ build: ## Build all Crossplane OCI packages locally (.xpkg files)
 		echo "→ building package/$$pkg"; \
 		crossplane xpkg build \
 			-f package/$$pkg \
-			-o platform-wxops-$$pkg.xpkg \
+			-o wxops-core-$$pkg.xpkg \
 			--ignore kustomization.yaml; \
 	done
 
 .PHONY: push
 push: build ## Build and push all packages to the registry
 	@for pkg in $(PACKAGES); do \
-		echo "→ pushing platform-wxops-$$pkg:$(VERSION)"; \
+		echo "→ pushing wxops-core-$$pkg:$(VERSION)"; \
 		crossplane xpkg push \
-			$(REGISTRY)/platform-wxops-$$pkg:$(VERSION) \
-			-f platform-wxops-$$pkg.xpkg; \
+			$(REGISTRY)/wxops-core-$$pkg:$(VERSION) \
+			-f wxops-core-$$pkg.xpkg; \
 	done
 
 .PHONY: validate
@@ -106,7 +106,7 @@ render: ## Render example XRs against compositions (offline dry-run)
 PYTHON ?= python3
 
 .PHONY: test
-test: test-xrd test-golden test-invariants ## Run the offline test suite (the merge gate)
+test: test-xrd test-api-compat test-golden test-invariants ## Run the offline test suite (the merge gate)
 	@echo ""
 	@echo "test suite passed"
 
@@ -121,6 +121,11 @@ test-golden: ## Golden render tests — output vs committed expectations
 .PHONY: test-invariants
 test-invariants: ## Rules that must hold for every package and case
 	@$(PYTHON) tests/invariants.py
+
+.PHONY: test-api-compat
+test-api-compat: ## Released API stays additive — schema diff, XR replay, golden resource checks vs last release
+	@$(PYTHON) tests/api_compat.py
+	@$(PYTHON) tests/api_compat.py --self-test
 
 .PHONY: test-structural
 test-structural: ## Best-effort third-party schema filter (NOT in `make test`)
@@ -169,15 +174,27 @@ changelog-preview: ## Preview unreleased changelog without writing
 	git-cliff --unreleased --strip all
 
 # ── Release ───────────────────────────────────────────────────────────────────
+# A release is named by the day it is cut — release-YYYY-MM-DD (UTC), .2 for a
+# second one that day. Compatibility is not carried by the name: it is the XRD
+# API version, held additive-only by tests/api_compat.py. See
+# release-notes/README.md.
 
 .PHONY: release-notes
-release-notes: ## Generate release-notes/<version>.md from template (usage: make release-notes VERSION=v0.2.0)
-	@echo "$(VERSION)" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' || \
-		(echo "error: VERSION must match v<major>.<minor>.<patch>, e.g. make release-notes VERSION=v0.2.0" >&2; exit 1)
-	@bash .gitea/scripts/check-release-notes.sh $(VERSION)
+release-notes: ## Scaffold release-notes/<release>.md with its compatibility report (VERSION defaults to today)
+	@ver="$(VERSION)"; [ -n "$$ver" ] || ver=$$(python3 .gitea/scripts/release-state.py next); \
+	echo "$$ver" | grep -qE '^release-[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$$' || \
+		{ echo "error: VERSION must look like release-YYYY-MM-DD[.N], e.g. make release-notes VERSION=release-2026-09-11" >&2; exit 1; }; \
+	bash .gitea/scripts/check-release-notes.sh "$$ver"
 
+.PHONY: release-check
+release-check: ## Fail if VERSIONS.yaml and package/install/ disagree
+	@python3 .gitea/scripts/release-state.py check
+
+# The release commit skips the test-api-compat hook: `release-state.py write`
+# has just run that same gate on this exact tree, and rerunning it after the
+# allowlist is cleared would re-fail every break the allowlist permitted.
 .PHONY: release
-release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=major|minor|patch | default: auto from commits
+release: ## Prepare a release commit + tag (no push) — VERSION=release-YYYY-MM-DD[.N] (default: today, UTC) | ALL=1 rebuilds every package
 	@which git-cliff > /dev/null || (echo "git-cliff not installed — see https://git-cliff.org/docs/installation" && exit 1)
 	@echo ""
 	@echo "  ROADMAP.md, README.md, docs/, and release-notes/ get staged and"
@@ -185,39 +202,28 @@ release: ## Prepare a release commit + tag (no push) — VERSION=vX.Y.Z | BUMP=m
 	@echo "  drifted before this runs, or right now in another terminal, since"
 	@echo "  nothing else in the tree may be dirty (see the check below)."
 	@echo ""
-	@if [ -n "$(VERSION)" ]; then \
-		ver="$(VERSION)"; \
-	elif [ -n "$(BUMP)" ]; then \
-		current=$$(git describe --tags --abbrev=0 2>/dev/null || echo "v0.0.0"); \
-		maj=$$(echo "$$current" | cut -d. -f1 | tr -d v); \
-		min=$$(echo "$$current" | cut -d. -f2); \
-		pat=$$(echo "$$current" | cut -d. -f3); \
-		case "$(BUMP)" in \
-			major) ver="v$$((maj+1)).0.0" ;; \
-			minor) ver="v$${maj}.$$((min+1)).0" ;; \
-			patch) ver="v$${maj}.$${min}.$$((pat+1))" ;; \
-			*) echo "error: BUMP must be major, minor, or patch" >&2; exit 1 ;; \
-		esac; \
-	else \
-		ver=$$(git-cliff --bumped-version 2>/dev/null); \
-		[ -n "$$ver" ] || { echo "error: git-cliff could not resolve next version — pass VERSION=vX.Y.Z or BUMP=major|minor|patch" >&2; exit 1; }; \
-	fi; \
-	echo "$$ver" | grep -qE '^v[0-9]+\.[0-9]+\.[0-9]+$$' \
-		|| { echo "error: '$$ver' is not valid semver (expected vX.Y.Z)" >&2; exit 1; }; \
+	@ver="$(VERSION)"; [ -n "$$ver" ] || ver=$$(python3 .gitea/scripts/release-state.py next); \
+	all=""; [ -z "$(ALL)" ] || all="--all"; \
+	echo "$$ver" | grep -qE '^release-[0-9]{4}-[0-9]{2}-[0-9]{2}(\.[0-9]+)?$$' \
+		|| { echo "error: '$$ver' is not a release name (expected release-YYYY-MM-DD[.N])" >&2; exit 1; }; \
 	dirty=$$(git status --porcelain -- . ':!ROADMAP.md' ':!README.md' ':!docs' ':!release-notes' ':!CHANGELOG.md'); \
 	[ -z "$$dirty" ] \
 		|| { echo "error: working tree has uncommitted changes outside ROADMAP.md/README.md/docs/release-notes/CHANGELOG.md — commit or stash before releasing:" >&2; echo "$$dirty" >&2; exit 1; }; \
-	git rev-parse "$$ver" >/dev/null 2>&1 \
+	git rev-parse -q --verify "refs/tags/$$ver" >/dev/null \
 		&& { echo "error: tag $$ver already exists" >&2; exit 1; }; \
-	echo "→ checking CHANGELOG.md for $$ver"; \
+	echo "→ classifying changes and pinning packages for $$ver"; \
+	python3 .gitea/scripts/release-state.py write "$$ver" $$all || exit 1; \
+	python3 .gitea/scripts/gen-readme-packages.py; \
+	echo "→ writing CHANGELOG.md for $$ver"; \
 	git-cliff --tag "$$ver" -o CHANGELOG.md; \
-	git add CHANGELOG.md ROADMAP.md README.md docs/ release-notes/; \
+	git add CHANGELOG.md ROADMAP.md README.md docs/ release-notes/ \
+		VERSIONS.yaml package/install/ tests/api-compat-allow.yaml; \
 	if git diff --cached --quiet; then \
-		echo "→ nothing to commit for $$ver — CHANGELOG.md, ROADMAP.md, README.md, docs/, release-notes/ all already up to date"; \
+		echo "→ nothing to commit for $$ver — no package pins, notes or docs changed"; \
 	else \
 		echo "→ staged for $$ver:"; \
 		git diff --cached --name-only | sed 's/^/    /'; \
-		SKIP=no-commit-to-branch git commit -m "chore(release): prepare for release $$ver"; \
+		SKIP=no-commit-to-branch,test-api-compat git commit -m "chore(release): prepare for release $$ver"; \
 	fi; \
 	echo "→ tagging $$ver"; \
 	git tag "$$ver"; \

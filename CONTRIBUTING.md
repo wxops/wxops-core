@@ -8,10 +8,17 @@ That shape decides how you contribute: **you change a schema or a template, and
 you prove the rendered output is what you intended.** This document covers the
 workflow, and in particular what a new package owes the test suite.
 
+**New to Crossplane, Terraform or KCL?** This document assumes you can already read a
+`Composition`. [`docs/learn/`](docs/learn/README.md) is four short pages that get you there first,
+each against a real file in this repo.
+
 - Architecture, conventions and the reference stack → [`CLAUDE.md`](CLAUDE.md)
 - Test harness internals → [`tests/README.md`](tests/README.md)
 - What is planned, deferred and rejected → [`ROADMAP.md`](ROADMAP.md)
-- Per-XRD API reference → [`docs/`](docs/)
+- Per-XRD API reference → [`docs/api-reference/`](docs/api-reference/README.md)
+- Every doc, and the development matrix → [`docs/README.md`](docs/README.md)
+- Hooks, make targets and releasing, in one place → [`docs/development/`](docs/development/README.md)
+- Recording *why* for a breaking or architectural decision → [`docs/adr/`](docs/adr/README.md)
 
 ---
 
@@ -59,19 +66,24 @@ Conventional Commits, enforced at commit-msg. Allowed types: `feat`, `fix`,
 There is **no `ci` type** — use `chore(ci):`. Scope with the package name where
 it applies: `feat(tenant-app): ...`.
 
-### Two rules that bite
+### Three rules that bite
 
 **`kcl/<pkg>/main.k` and `package/<pkg>/composition.yaml` must be committed
 together.** The KCL is embedded into the composition by `make kcl-sync`, because
 `crossplane xpkg build` only packages the Configuration directory. A drift hook
 rejects a split commit.
 
-**Changed a package? Bump `VERSIONS.yaml`.** Shipping a changed package on an
-existing version overwrites a published OCI tag with different content. Follow
-the rules in the file header: backward-compatible schema change → patch; new
-`api.served` version → minor; breaking → new API version first. Then
-`make readme-sync`. One bump per package per logical release batch, not per
-commit.
+**A released XRD only grows.** `make test` includes `test-api-compat`, which compares every XRD,
+every XR and every golden against the last release tag. Removing or retyping a field, making a
+field required on an existing object, narrowing an enum, renaming a composed resource or changing
+a `Deployment` selector all fail it. A new API version does not get around this — Crossplane has no
+conversion between XRD versions — so a breaking need becomes a new optional field beside the old
+one. If a break is truly deliberate, list it in `tests/api-compat-allow.yaml` with a reason, where
+the reviewer sees it.
+
+**There is no version to bump.** Releases are named by date, and `make release` pins changed
+packages in `VERSIONS.yaml` and `package/install/` itself; a hand edit to either fails the
+`release-state-check` hook. See [`release-notes/README.md`](release-notes/README.md).
 
 ---
 
@@ -85,11 +97,12 @@ commit.
 5. `make test-update` to accept, then `git diff tests/` once more.
 6. Add a case if you added a branch — see below.
 
-Classify the change against the taxonomy in [`ROADMAP.md`](ROADMAP.md)
-(`safe` / `careful` / `breaking`) and sequence `careful` edits into their own
-commit so they can be reverted alone. Renaming a composed resource, or changing
-an immutable field like a `Deployment` selector or a PVC's `storageClassName`, is
-never `safe` — read the hazard sections before doing either.
+`make test-api-compat` classifies the change against the taxonomy in [`ROADMAP.md`](ROADMAP.md)
+(`safe` / `careful` / `breaking`) for you. Sequence `careful` edits into their own commit so they
+can be reverted alone, and expect to explain them in release notes — `make release` requires notes
+for anything not `safe`. Renaming a composed resource, or changing an immutable field like a
+`Deployment` selector or a PVC's `storageClassName`, is never `safe` and fails the check — read the
+hazard sections before doing either.
 
 ---
 
@@ -106,10 +119,9 @@ The checklist:
 - [ ] `docs/<name>.md` + a row in [`docs/README.md`](docs/README.md)
 - [ ] **`tests/cases/<name>/` — see below**
 - [ ] `PACKAGES` array in [`.gitea/scripts/validate-packages.sh`](.gitea/scripts/validate-packages.sh)
-- [ ] `PACKAGES` in the `Makefile`, and the matrix in [`.gitea/workflows/publish-packages.yaml`](.gitea/workflows/publish-packages.yaml)
-- [ ] `PACKAGES` in [`.gitea/scripts/check-versions-bump.sh`](.gitea/scripts/check-versions-bump.sh) and the `files:` regex of the `versions-bump-check` hook
+- [ ] `PACKAGES` in the `Makefile`, and the matrix in [`.github/workflows/publish-packages.yaml`](.github/workflows/publish-packages.yaml)
 - [ ] If KCL: add the package to the `kcl-drift-check` hook's `files:` regex
-- [ ] `VERSIONS.yaml` entry, then `make readme-sync`
+- [ ] `VERSIONS.yaml` entry with `current: unreleased` and no `package/install/` manifest — `make release` writes both on the first release — then `make readme-sync`
 - [ ] Any new API group the composition targets → `providers/rbac-provider-kubernetes.yaml`
 
 That last one has no offline test. provider-kubernetes runs with

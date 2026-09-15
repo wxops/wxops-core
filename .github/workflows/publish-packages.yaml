@@ -1,14 +1,17 @@
 name: Publish Crossplane Packages
 
-# Through v0.4.0, Gitea was primary and GitHub received a deliberate push per
-# release. From v0.5.0, GitHub is primary and Gitea is archived (frozen,
-# read-only). This workflow fires on a tag pushed directly here.
+# Fires on a release tag — release-YYYY-MM-DD[.N], cut by `make release`.
 #
-# NOT YET DONE for the v0.5.0 cutover: this workflow still doesn't commit
-# package/install/*.yaml or CHANGELOG.md bumps back to main — that job only
-# exists on the Gitea side today, written for a Gitea-primary world where
-# adding it here too would have raced it. Add it here before the first
-# post-cutover release, or that release ships with a stale package/install/.
+# The release commit is the whole truth. `make release` has already gated the
+# change through tests/api_compat.py, decided which packages changed, pinned
+# them in VERSIONS.yaml and package/install/, and regenerated CHANGELOG.md. This
+# workflow only builds what that commit says: a package is rebuilt when its
+# VERSIONS.yaml `current` equals the pushed tag. Nothing commits back to main —
+# a bot rewriting package/install/ after the tag is how commit f22f0d7 put every
+# manifest back on the Gitea registry.
+#
+# GitHub is primary from the first date-named release. Gitea is archived and no
+# longer publishes; its publish workflow was removed.
 #
 # One-time manual setup:
 #   1. GitHub org "wxops": Settings → Packages → Package creation must permit
@@ -23,7 +26,7 @@ name: Publish Crossplane Packages
 on:
   push:
     tags:
-      - "v*"
+      - "release-*"
 
 permissions:
   contents: write   # create the GitHub Release
@@ -69,8 +72,6 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          fetch-depth: 0
 
       - name: Install Crossplane CLI
         run: |
@@ -85,40 +86,21 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Resolve package version from VERSIONS.yaml
-        id: pkg-version
-        env:
-          PKG: ${{ matrix.package }}
-        run: |
-          pkg_ver=$(sed -n "/^  ${PKG}:/,/^  [a-z]/p" VERSIONS.yaml | grep "current:" | awk '{print $2}')
-          echo "value=${pkg_ver}" >> $GITHUB_OUTPUT
-
-      # Same "skip unchanged packages" logic as the Gitea workflow. On the
-      # mirror, `git describe` walks the mirrored tag history, which the push
-      # mirror carries over — so this behaves identically to the Gitea side.
-      - name: Check if version changed since last release
+      # No change detection here — `make release` did it and wrote the answer
+      # into VERSIONS.yaml. Recomputing it would be a second source of truth.
+      - name: Is this package in the release?
         id: changed
         env:
           PKG: ${{ matrix.package }}
-          CURR_VER: ${{ steps.pkg-version.outputs.value }}
+          TAG: ${{ github.ref_name }}
         run: |
-          prev_tag=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
-          if [ -z "$prev_tag" ]; then
-            echo "→ ${PKG}: no previous tag — building"
-            echo "value=true" >> $GITHUB_OUTPUT
-            exit 0
-          fi
-          prev_ver=$(git show "${prev_tag}:VERSIONS.yaml" 2>/dev/null | \
-            sed -n "/^  ${PKG}:/,/^  [a-z]/p" | { grep "current:" || true; } | awk '{print $2}')
-          if [ -z "$prev_ver" ]; then
-            echo "→ ${PKG}: not present at ${prev_tag} — first release, building"
-            echo "value=true" >> $GITHUB_OUTPUT
-          elif [ "$prev_ver" = "$CURR_VER" ]; then
-            echo "→ ${PKG}: unchanged at ${CURR_VER} — skipping"
-            echo "value=false" >> $GITHUB_OUTPUT
+          current=$(sed -n "/^  ${PKG}:/,/^  [a-z]/p" VERSIONS.yaml | grep "current:" | awk '{print $2}')
+          if [ "$current" = "$TAG" ]; then
+            echo "→ ${PKG}: pinned to ${TAG} — building"
+            echo "value=true" >> "$GITHUB_OUTPUT"
           else
-            echo "→ ${PKG}: ${prev_ver} → ${CURR_VER}"
-            echo "value=true" >> $GITHUB_OUTPUT
+            echo "→ ${PKG}: unchanged, last changed in ${current} — skipping"
+            echo "value=false" >> "$GITHUB_OUTPUT"
           fi
 
       - name: Build package
@@ -126,22 +108,22 @@ jobs:
         run: |
           crossplane xpkg build \
             -f package/${{ matrix.package }} \
-            -o platform-wxops-${{ matrix.package }}.xpkg \
+            -o wxops-core-${{ matrix.package }}.xpkg \
             --ignore kustomization.yaml
 
-      - name: Push versioned tag
+      - name: Push release tag
         if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
-            ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:${{ steps.pkg-version.outputs.value }} \
-            -f platform-wxops-${{ matrix.package }}.xpkg
+            ${{ env.REGISTRY }}/wxops-core-${{ matrix.package }}:${{ github.ref_name }} \
+            -f wxops-core-${{ matrix.package }}.xpkg
 
       - name: Push latest tag
         if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
-            ${{ env.REGISTRY }}/platform-wxops-${{ matrix.package }}:latest \
-            -f platform-wxops-${{ matrix.package }}.xpkg
+            ${{ env.REGISTRY }}/wxops-core-${{ matrix.package }}:latest \
+            -f wxops-core-${{ matrix.package }}.xpkg
 
   create-release:
     name: Create GitHub release
@@ -149,33 +131,47 @@ jobs:
     needs: build-push
 
     steps:
+      # Full history: the package table measures changes against the previous
+      # release tag, and git-cliff needs the tags to find this release's commits.
       - name: Checkout
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
 
-      - name: Install git-cliff
-        run: pip install git-cliff --break-system-packages
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Install tooling
+        run: |
+          python3 -m venv .venv
+          echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
+          .venv/bin/pip install --quiet git-cliff -r tests/requirements.txt
 
       - name: Build release body
         env:
-          VERSION: ${{ github.ref_name }}
+          TAG: ${{ github.ref_name }}
         run: |
-          notes_file="release-notes/${VERSION}.md"
-          base="${notes_file}"
-          if [ ! -f "$base" ]; then
-            base="release-notes/template.md"
+          set -euo pipefail
+          body=/tmp/release-body.md
+          : > "$body"
+          # Optional for a `safe` release; `make release` refused to tag
+          # anything else without it.
+          if [ -f "release-notes/${TAG}.md" ]; then
+            { cat "release-notes/${TAG}.md"; printf '\n---\n\n'; } >> "$body"
           fi
-          { cat "$base"; printf '\n---\n\n'; } > /tmp/release-body.md
-          git-cliff --current --strip all >> /tmp/release-body.md
+          {
+            printf '## Packages\n\n'
+            python3 .gitea/scripts/release-state.py summary "$TAG"
+            printf '\n---\n\n'
+          } >> "$body"
+          git-cliff --current --strip all >> "$body"
 
-      # No custom PAT — GITHUB_TOKEN is sufficient for a release on this same
-      # repository, and cliff.toml's links already point at github.com/wxops.
       - name: Create release
         uses: softprops/action-gh-release@v2
         with:
           tag_name: ${{ github.ref_name }}
-          name: Release ${{ github.ref_name }}
+          name: "W'xOps Core ${{ github.ref_name }}"
           body_path: /tmp/release-body.md
           draft: false
           prerelease: false

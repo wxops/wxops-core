@@ -1,0 +1,30 @@
+# expect: breaking type-changed
+#
+# `replicas: "2"` was valid; it is not an integer. Existing XRs fail validation,
+# and the portal's typed client for this field breaks with them.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xwidgets.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Namespaced
+  names:
+    kind: XWidget
+    plural: xwidgets
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    replicas:
+                      type: integer

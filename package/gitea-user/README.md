@@ -1,4 +1,4 @@
-# platform-wxops-gitea-user
+# wxops-core-gitea-user
 
 Crossplane Configuration package that manages a single Gitea user lifecycle — create, update, and delete — through a Kubernetes-native XR claim.
 
@@ -88,15 +88,15 @@ See `examples/gitea-user/xr.yaml` for a working example.
 # Build the OCI package
 crossplane xpkg build \
   -f package/gitea-user \
-  --name platform-wxops-gitea-user
+  --name wxops-core-gitea-user
 
 # Push to a registry
 crossplane xpkg push \
-  ghcr.io/wxops/platform-wxops-gitea-user:v0.1.0 \
-  -f platform-wxops-gitea-user.xpkg
+  ghcr.io/wxops/wxops-core-gitea-user:v0.1.0 \
+  -f wxops-core-gitea-user.xpkg
 
 # Push to a private Gitea registry
 crossplane xpkg push \
-  gitea.example.com/<owner>/platform-wxops-gitea-user:v0.1.0 \
-  -f platform-wxops-gitea-user.xpkg
+  gitea.example.com/<owner>/wxops-core-gitea-user:v0.1.0 \
+  -f wxops-core-gitea-user.xpkg
 ```

@@ -1,0 +1,34 @@
+# expect: careful default-changed
+#
+# No XR is rejected, but every XR that omitted `size` silently becomes `large`
+# on its next reconcile. Allowed through the gate; release notes must say so.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xwidgets.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Namespaced
+  names:
+    kind: XWidget
+    plural: xwidgets
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  properties:
+                    size:
+                      type: string
+                      enum:
+                        - small
+                        - large
+                      default: large

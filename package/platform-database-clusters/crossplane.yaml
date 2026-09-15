@@ -1,7 +1,7 @@
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: platform-wxops-platform-database-clusters
+  name: wxops-core-platform-database-clusters
   annotations:
     meta.crossplane.io/maintainer: W'xOps Platform Team
     meta.crossplane.io/description: Platform-managed CloudNativePG cluster with Vault credential seeding.

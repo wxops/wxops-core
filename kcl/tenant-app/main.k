@@ -222,7 +222,7 @@ ns = params.namespace
 # one wired up today, so leaving spec.parameters.cluster unset keeps
 # behaviour identical. Naming the ProviderConfig here rather than hardcoding
 # it means adding a spoke later is a ProviderConfig + one field, not an edit
-# to every resource in this file. See docs/multi-cluster.md.
+# to every resource in this file. See docs/core-ideas/multi-cluster.md.
 targetCluster = _get(params, "cluster", "default")
 appFlavor = _get(params, "appFlavor", "webapp")
 environment = _get(params, "environment", "dev")
@@ -969,7 +969,7 @@ _pvc_items = [{
 # this replaces are inert here: they are a convention read only by a
 # kubernetes_sd_config job with matching relabel rules, and
 # kube-prometheus-stack's additionalScrapeConfigs is empty.
-# Full rationale: docs/observability.md
+# Full rationale: docs/core-ideas/observability.md
 _mon = _get(params, "monitoring", {})
 _monEnabled = _get(_mon, "enabled", False)
 _monKind = _get(_mon, "kind", "auto")

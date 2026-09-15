@@ -4,6 +4,7 @@ metadata:
   name: xgiteausers.platform.wxops.cloud
   labels:
     crossplane.io/xrd: xgiteausers.platform.wxops.cloud
+    channel: stable
 spec:
   compositeTypeRef:
     apiVersion: platform.wxops.cloud/v1alpha1

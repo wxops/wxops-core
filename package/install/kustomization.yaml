@@ -4,8 +4,8 @@
 # Usage:
 #   kubectl apply -k package/install/
 #
-# Prerequisites: ensure spec.package in each file points to your published image.
-# CI auto-bumps these on every v* tag push via .gitea/workflows/publish-packages.yaml.
+# Pins are written by `make release` (.gitea/scripts/release-state.py), never by
+# hand: each package points at the release it last changed in, on ghcr.io/wxops.
 apiVersion: kustomize.config.k8s.io/v1beta1
 kind: Kustomization
 resources:

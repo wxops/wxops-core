@@ -1,0 +1,35 @@
+# expect: breaking immutable-changed
+#
+# A label added to spec.selector.matchLabels as well as to the pod template.
+# Kubernetes rejects the in-place update, the Object enters a permanent
+# reconcile error, and the old Deployment keeps running so nobody notices.
+# ROADMAP.md "The immutable-field hazard".
+apiVersion: kubernetes.crossplane.io/v1alpha2
+kind: Object
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: app-deployment
+  name: app-deployment
+spec:
+  forProvider:
+    manifest:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: app
+        namespace: tenant
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/component: app
+            app.kubernetes.io/name: app
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/component: app
+              app.kubernetes.io/name: app
+          spec:
+            containers:
+              - name: app
+                image: app:1.0.0

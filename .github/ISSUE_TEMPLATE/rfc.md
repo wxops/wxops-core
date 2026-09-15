@@ -14,7 +14,7 @@ XRD's public schema, adds a package, changes a composition's emitted
 resources, or commits the platform to a new tool.
 
 Before writing: check ROADMAP.md "Out of scope" and "Decided and rejected",
-and docs/solution-matrix.md — your idea may be tracked, planned, or already
+and docs/core-ideas/solution-matrix.md — your idea may be tracked, planned, or already
 closed. Referencing that beats rediscovering it in review.
 -->
 

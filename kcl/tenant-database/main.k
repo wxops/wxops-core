@@ -125,7 +125,7 @@ dbName = params.dbName
 # one wired up today, so leaving spec.parameters.cluster unset keeps
 # behaviour identical. Naming the ProviderConfig here rather than hardcoding
 # it means adding a spoke later is a ProviderConfig + one field, not an edit
-# to every resource in this file. See docs/multi-cluster.md.
+# to every resource in this file. See docs/core-ideas/multi-cluster.md.
 targetCluster = _get(params, "cluster", "default")
 owner = params.owner
 tier = _get(params, "tier", "shared")
