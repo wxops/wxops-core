@@ -1,22 +1,22 @@
 #!/usr/bin/env bash
 # .gitea/scripts/check-release-notes.sh
 #
-# Convenience helper: generates release-notes/<version>.md from the template
-# in release-notes/template.md, with a git-cliff reference block appended.
+# Scaffolds release-notes/<release>.md: release-notes/template.md with its
+# Compatibility section pre-filled from tests/api_compat.py, plus a git-cliff
+# reference block of the commits going into the release.
 #
-# The file is OPTIONAL. If absent, CI auto-generates the release body from
-# git-cliff alone. Only create one when a release warrants human context —
-# highlights, breaking-change notes, upgrade instructions, etc.
+# Required when a release carries a `careful` or `breaking` change — `make
+# release` refuses without it. Optional otherwise: the release body CI builds
+# always carries the package table and the changelog.
 #
-# Usage: bash .gitea/scripts/check-release-notes.sh <version>
-#        make release-notes VERSION=vX.Y.Z
+# Usage: bash .gitea/scripts/check-release-notes.sh <release>
+#        make release-notes [VERSION=release-YYYY-MM-DD]
 
 set -euo pipefail
 
 NOTES_DIR="release-notes"
-TEMPLATE_SRC="${NOTES_DIR}/template.md"
 
-version="${1:?usage: check-release-notes.sh <version>}"
+version="${1:?usage: check-release-notes.sh <release>}"
 notes_file="${NOTES_DIR}/${version}.md"
 
 if [[ -f "$notes_file" ]]; then
@@ -26,8 +26,13 @@ fi
 
 echo "→ generating ${notes_file} from template"
 
+# Build into a temp file: a failed compatibility report must not leave a
+# half-written notes file behind for `make release` to accept.
+tmp=$(mktemp)
+trap 'rm -f "$tmp"' EXIT
+
 {
-  cat "${TEMPLATE_SRC}"
+  python3 .gitea/scripts/release-state.py notes "$version"
   printf '\n---\n\n'
   printf '<!-- Reference block: upcoming commits for this release.\n'
   printf '     Use this to write your Highlights, then REMOVE this section.\n'
@@ -38,11 +43,12 @@ echo "→ generating ${notes_file} from template"
   else
     printf '<!-- git-cliff not installed — run: pip install git-cliff -->\n'
   fi
-} > "${notes_file}"
+} > "$tmp"
+cat "$tmp" > "$notes_file"
 
 printf '\n'
 printf '   Generated: %s\n' "${notes_file}"
 printf '\n'
-printf '   Edit it (fill in Highlights / Upgrade notes / Known issues),\n'
-printf '   remove the reference block at the bottom, then commit.\n'
+printf '   Fill in Highlights, explain every Compatibility row that is not `safe`,\n'
+printf '   and remove the reference block at the bottom. `make release` commits it.\n'
 printf '\n'

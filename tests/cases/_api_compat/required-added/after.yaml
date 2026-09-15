@@ -1,0 +1,35 @@
+# expect: breaking required-added
+#
+# `size` becomes required on an object that already existed. Every XR written
+# without it now fails validation on its next update.
+apiVersion: apiextensions.crossplane.io/v2
+kind: CompositeResourceDefinition
+metadata:
+  name: xwidgets.platform.wxops.cloud
+spec:
+  group: platform.wxops.cloud
+  scope: Namespaced
+  names:
+    kind: XWidget
+    plural: xwidgets
+  versions:
+    - name: v1alpha1
+      served: true
+      referenceable: true
+      schema:
+        openAPIV3Schema:
+          type: object
+          properties:
+            spec:
+              type: object
+              properties:
+                parameters:
+                  type: object
+                  required:
+                    - name
+                    - size
+                  properties:
+                    name:
+                      type: string
+                    size:
+                      type: string

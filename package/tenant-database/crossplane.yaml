@@ -1,7 +1,7 @@
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: platform-wxops-tenant-database
+  name: wxops-core-tenant-database
   annotations:
     meta.crossplane.io/maintainer: W'xOps Platform Team
     meta.crossplane.io/description: Tenant-facing PostgreSQL database on a platform CNPG cluster with Vault-backed credentials.

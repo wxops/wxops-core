@@ -35,7 +35,7 @@ def build_table() -> str:
             f" | {api_versions} | `{pkg_version}` |"
         )
     return "\n".join([
-        "| Package | Kind | Group | API Versions | Package Version |",
+        "| Package | Kind | Group | API Versions | Last changed in |",
         "|---|---|---|---|---|",
         *rows,
     ])

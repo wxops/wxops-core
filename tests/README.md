@@ -40,16 +40,17 @@ cluster's API server would hand the composition. (`crossplane render --xrd` does
 that step the tests would exercise KCL's `_get` fallbacks rather than the real
 defaults, and a disagreement between the two would be invisible.
 
-## The four checks
+## The five checks
 
 | Command | Strictness | What it catches |
 |---|---|---|
 | `make test-xrd` | **strict** | XRs violating our own XRD schema; negative cases that are *not* rejected |
+| `make test-api-compat` | **strict** | breaking changes to an API that has already been released |
 | `make test-golden` | **strict** | any change to rendered output |
 | `make test-invariants` | **strict** | rules that must hold everywhere, including in cases nobody wrote |
 | `make test-structural` | best-effort, **advisory** | structural mistakes in third-party manifests |
 
-`make test` runs the first three. `test-structural` is deliberately excluded —
+`make test` runs the first four. `test-structural` is deliberately excluded —
 see below.
 
 ### `test-xrd` — strict, because these are our schemas
@@ -115,6 +116,38 @@ own. These are version-independent and encode decisions already written down:
 | CNPG `Cluster` | `instances` is an int; `storage.size` carries a unit |
 | `IngressRoute` | `entryPoints` non-empty; every route has a `match`; `tls.secretName` matches a composed `Certificate` |
 | `ServiceMonitor`/`PodMonitor` | `release: kube-prometheus-stack` label, `component` in the selector, `sampleLimit` set |
+
+### `test-api-compat` — a released API only grows
+
+The other checks compare the tree with itself. This one compares it with **the last release tag**,
+because that is what clusters and the portal actually run. Crossplane has no conversion between XRD
+versions — "the schema of each version can't change any existing fields" — so a released schema is
+additive-only, and a new API version is not a way around that.
+
+Three checks per package:
+
+| Check | `breaking` — fails | `careful` — passes, needs release notes |
+|---|---|---|
+| **Schema diff** — every version, `spec` and `status` | field removed or retyped, `required` added to an existing object, enum or bound narrowed, pruning enabled, version removed or unserved, `group`/`names`/`scope` changed | default changed, enum widened |
+| **Replay** — every XR valid at the tag, validated again now | now invalid, or a field would be silently pruned | — |
+| **Golden baseline** — goldens at the tag vs now, for cases whose inputs did not change | composed resource removed or renamed (deleted in-cluster), immutable field changed (`Deployment` selector, PVC storage class) | any other content change |
+
+A deliberate break goes in `tests/api-compat-allow.yaml` with a reason, where the reviewer sees it;
+`make release` then requires release notes and clears the list.
+
+The classifier is itself tested. Each `tests/cases/_api_compat/<fixture>/` holds `before.yaml` and
+`after.yaml` — XRDs or rendered documents — and an `# expect: <tier> <rule>` comment. `--self-test`
+fails if an expectation is not produced *or* anything more severe appears, so a `safe` fixture cannot
+quietly turn breaking.
+
+```bash
+python3 tests/api_compat.py                   # vs the last release tag
+python3 tests/api_compat.py --baseline v0.4.0
+python3 tests/api_compat.py --self-test
+```
+
+With no release tag reachable — a shallow clone — it skips rather than fails. CI checks out full
+history for that reason.
 
 ### `test-structural` — best-effort, and not a gate
 
@@ -182,14 +215,19 @@ tests/
 ├── README.md
 ├── requirements.txt
 ├── xrd.py              strict — our XRD schemas + negative cases
+├── api_compat.py       strict — released API stays additive, vs the last release tag
+├── api-compat-allow.yaml  deliberate breaks for the next release, each with a reason
 ├── golden.py           strict — rendered output vs committed goldens
 ├── invariants.py       strict — cross-cutting rules + field contracts
 ├── structural.py       advisory — third-party schema filter (pinned)
 ├── lib/
 │   ├── render.py       render, normalise, XRD defaulting
 │   ├── xrdschema.py    schema load, validate, defaults, unknown fields
+│   ├── releases.py     release-tag lookup, file content at a tag
 │   └── mkobserved.py   generate observed.yaml fixtures
-└── cases/<package>/
-    ├── <case>/         xr.yaml [+ observed.yaml] [+ required.yaml] + expected.yaml
-    └── _invalid/       XRs that must be rejected, with `# expect:` comments
+└── cases/
+    ├── <package>/
+    │   ├── <case>/     xr.yaml [+ observed.yaml] [+ required.yaml] + expected.yaml
+    │   └── _invalid/   XRs that must be rejected, with `# expect:` comments
+    └── _api_compat/    before.yaml + after.yaml pairs the classifier must tier correctly
 ```

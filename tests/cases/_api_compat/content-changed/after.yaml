@@ -1,0 +1,32 @@
+# expect: careful content-changed
+#
+# Same resource, same selector, a new pod-template label: a rolling restart of
+# every tenant on the next reconcile. Not breaking, but it belongs in the notes.
+apiVersion: kubernetes.crossplane.io/v1alpha2
+kind: Object
+metadata:
+  annotations:
+    crossplane.io/composition-resource-name: app-deployment
+  name: app-deployment
+spec:
+  forProvider:
+    manifest:
+      apiVersion: apps/v1
+      kind: Deployment
+      metadata:
+        name: app
+        namespace: tenant
+      spec:
+        replicas: 1
+        selector:
+          matchLabels:
+            app.kubernetes.io/name: app
+        template:
+          metadata:
+            labels:
+              app.kubernetes.io/name: app
+              wxops.cloud/environment: dev
+          spec:
+            containers:
+              - name: app
+                image: app:1.0.0

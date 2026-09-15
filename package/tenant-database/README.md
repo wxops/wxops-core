@@ -1,4 +1,4 @@
-# platform-wxops-tenant-database
+# wxops-core-tenant-database
 
 Crossplane Configuration package that provisions a tenant-facing PostgreSQL
 database on a platform [`XPlatformDatabaseCluster`](../platform-database-clusters/),
@@ -75,13 +75,13 @@ spec:
 > `XPlatformDatabaseCluster` must include
 > `wxops.cloud/managed-by: platform-database-clusters` for shared pool
 > discovery. See
-> [`docs/tenant-database.md`](../../docs/tenant-database.md#required-discovery-labels)
+> [`docs/api-reference/tenant-database.md`](../../docs/api-reference/tenant-database.md#required-discovery-labels)
 > for details.
 
 See [`examples/tenant-database/xr.yaml`](../../examples/tenant-database/xr.yaml)
 and [`examples/tenant-database/xr-dedicated.yaml`](../../examples/tenant-database/xr-dedicated.yaml)
 for full examples, and
-[`docs/tenant-database.md`](../../docs/tenant-database.md) for the complete
+[`docs/api-reference/tenant-database.md`](../../docs/api-reference/tenant-database.md) for the complete
 `spec.parameters` reference (including `dedicatedCluster` sizing and
 `databaseReclaimPolicy` semantics).
 

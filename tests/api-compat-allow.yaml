@@ -1,0 +1,17 @@
+# tests/api-compat-allow.yaml — deliberate breaking changes for the NEXT release.
+#
+# tests/api_compat.py fails on any breaking change to an API that has already
+# been released: a removed or retyped field, a new required field, a narrowed
+# enum, a composed resource that would be deleted, a changed immutable field.
+# When the break is deliberate, list it here so the PR diff puts it in front of
+# a reviewer. Copy package/rule/path exactly from the api_compat output:
+#
+#   - package: tenant-app
+#     rule: property-removed
+#     path: v1alpha1.spec.parameters.oldField
+#     reason: Replaced by newField; no XR in any cluster sets it (checked with kubectl).
+#
+# An entry without a reason is ignored. `make release` requires release notes
+# while any entry is in use and clears this list in the release commit — an
+# allowance covers one release, never a standing exemption.
+allow: []

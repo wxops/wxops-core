@@ -1,4 +1,4 @@
-# platform-wxops-tenant-app
+# wxops-core-tenant-app
 
 Crossplane Configuration package that provisions a tenant application
 scaffold — `Deployment` + `Service` + optional `Ingress` + optional
@@ -82,7 +82,7 @@ full set of optional fields (`serviceAccount`, `securityContext`,
 `terminationGracePeriodSeconds`, `imagePullSecrets`, `secretsFrom`,
 `rolloutStrategy`, `darlane`, `probes`, `ingress.tls`/`ingress.auth`,
 `labels`/`deploymentAnnotations`, `templateId`/`repository.url`), and
-[`docs/tenant-app.md`](../../docs/tenant-app.md) for the complete
+[`docs/api-reference/tenant-app.md`](../../docs/api-reference/tenant-app.md) for the complete
 `spec.parameters` reference and the Golden Path Contract.
 
 ## Relation to other packages
@@ -95,4 +95,4 @@ XTenantDatabase (rocket-team / payment-db)     ← secretsFrom.database
 
 For the full scaffold-to-running-app golden path (pick a template, create or
 import a repo, push the skeleton, deploy), see
-[`docs/app-onboarding.md`](../../docs/app-onboarding.md).
+[`docs/user-guide/app-onboarding.md`](../../docs/user-guide/app-onboarding.md).

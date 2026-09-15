@@ -57,7 +57,9 @@ Seven Crossplane Configuration packages plus one utility:
 | `tenant-app` | `XTenantApp` | function-kcl |
 | `random-password` | `XRandomPassword` | utility, not published as OCI |
 
-Package versions and XRD API versions are tracked in `VERSIONS.yaml`.
+Served XRD API versions, and the release each package last changed in, are tracked in
+`VERSIONS.yaml`. Releases are named by date (`release-YYYY-MM-DD`); compatibility is the API
+version, not the release name — see [`release-notes/README.md`](release-notes/README.md).
 
 ## Directory layout
 
@@ -68,12 +70,26 @@ Package versions and XRD API versions are tracked in `VERSIONS.yaml`.
 - `kcl/<name>/` — KCL composition source (`kcl.mod`, `main.k`)
 - `examples/<name>/` — minimal XR YAML to exercise each package
 - `tests/cases/<name>/` — test cases; `tests/lib/` shared harness (see [Testing](#testing))
-- `docs/` — per-XRD API reference **plus the architecture library**: start at
-  `docs/solution-matrix.md` (the map), then `multi-cluster{,-proposal,-scale}.md`,
-  `self-service-operations.md`, `knowledge-architecture.md`, `status-contract.md`,
-  `darlane.md`, `guardian.md`, `observability.md`. Check the matrix before
-  proposing work — it records what's shipped, designed, and rejected.
-- `release-notes/` — hand-written notes for significant releases (CI merges with git-cliff output)
+- `docs/` — six sections behind one hub, `docs/README.md`, which also holds the
+  **development matrix** (every package, core idea and delivery mechanism, its state and next step).
+  Check the matrix and `docs/core-ideas/solution-matrix.md` before proposing work: they record what's
+  shipped, designed and rejected. The sections:
+  - `docs/learn/` — contributor onboarding for Crossplane/Terraform/KCL newcomers, each page against
+    a real file in this repo; prerequisite reading for `docs/development/`, not part of it
+  - `docs/api-reference/` — the reconcile loop from a user's side (`README.md`), one page per Kind,
+    `status-contract.md`
+  - `docs/core-ideas/` — `solution-matrix.md`, `darlane.md`, `guardian.md`,
+    `multi-cluster{,-proposal,-connectivity,-scale}.md`, `observability.md`,
+    `self-service-operations.md`, `knowledge-architecture.md`, `security-threat-model.md`
+  - `docs/user-guide/` — `setup.md`, `app-onboarding.md`, `portal-integration.md`
+  - `docs/development/` — the development guide (`README.md`), `releasing.md`
+  - `docs/adr/` — one committed file per decision of lasting consequence (`TEMPLATE.md`, `README.md`
+    for the lifecycle); breaking or architectural changes get one, so the reasoning survives
+    independent of any single conversation — see [ADR-001](docs/adr/001-package-channel-label.md)
+
+  No other folders under `docs/`; the hub's *Where new docs go* table says which section a new doc
+  belongs in.
+- `release-notes/` — hand-written release notes; required when a change is `careful`/`breaking` (CI adds the package table and git-cliff output)
 
 When adding new work, place it in the matching directory. Do not create new top-level folders.
 
@@ -82,7 +98,8 @@ When adding new work, place it in the matching directory. Do not create new top-
 ```bash
 # Tests (see Testing below) — offline, no cluster
 make test-deps                         # once: pip install -r tests/requirements.txt
-make test                              # merge gate: XRD conformance + golden + invariants
+make test                              # merge gate: XRD conformance + API compat + golden + invariants
+make test-api-compat                   # released XRDs stay additive (vs last release tag)
 make test-update                       # regenerate goldens after an intentional change
 make test-structural                   # advisory third-party schema filter, never gates
 
@@ -92,7 +109,7 @@ make kcl-check                         # verify sync without modifying
 
 # Build & publish
 make build                             # build all OCI packages locally
-make push REGISTRY=ghcr.io/wxops VERSION=v0.1.0  # build + push
+make push REGISTRY=ghcr.io/wxops VERSION=release-2026-09-11  # build + push (CI does this on tag)
 make validate                          # crossplane xpkg build (no push)
 
 # Lint & render
@@ -105,10 +122,11 @@ make providers                         # install providers/functions once per cl
 make install                           # install from OCI registry (production)
 make install-dev                       # apply XRDs + Compositions directly (development)
 
-# Release
-make release VERSION=vX.Y.Z            # changelog + tag (no push)
-make release BUMP=patch                # auto-increment from last tag
-make release-notes VERSION=vX.Y.Z      # scaffold release notes from template
+# Release — named by date, release-YYYY-MM-DD[.N] (UTC); see release-notes/README.md
+make release                           # API gate + pin changed packages + changelog + tag (no push)
+make release ALL=1                     # rebuild every package (registry move, first date-named release)
+make release-notes                     # scaffold notes; required for careful/breaking changes
+make release-check                     # VERSIONS.yaml and package/install/ agree
 make changelog                          # regenerate CHANGELOG.md (requires git-cliff)
 ```
 
@@ -121,9 +139,9 @@ Commits are validated by:
 2. **YAML lint** + **kubeconform** schema validation
 3. **Crossplane xpkg build** for all packages
 4. **KCL drift check** — composition.yaml must match kcl/{pkg}/main.k
-5. **VERSIONS.yaml bump check** — changed packages must have a version bump
+5. **Package pins** — `VERSIONS.yaml` `current` agrees with `package/install/` (both written by `make release`)
 6. **README packages table** in sync with VERSIONS.yaml
-7. **XRD conformance** + **composition invariants** (fast, every commit)
+7. **XRD conformance** + **API compatibility** + **composition invariants** (fast, every commit)
 8. **Golden render tests** — `pre-push` stage only, ~90s
 
 CI enforces the same gates on every pull request via
@@ -140,7 +158,9 @@ When adding new capabilities:
 4. Add `crossplane.yaml` (package metadata) to the same package directory.
 5. Add a minimal `examples/<name>/xr.yaml` that exercises the XRD.
 6. **Add test cases under `tests/cases/<name>/`** — see [Testing](#testing) below. A new package is not done until it has them.
-7. Bump `VERSIONS.yaml` and run `make readme-sync`.
+7. Add a `VERSIONS.yaml` entry with `current: unreleased` and run `make readme-sync`. Never
+   hand-edit `current` on an existing package — `make release` pins it. A change to a released
+   XRD must stay additive; `make test-api-compat` classifies it.
 
 Start simple before reaching for advanced patterns.
 
@@ -160,7 +180,7 @@ images in Docker; the unit under test is the composition itself. Full detail in
 
 ```bash
 make test-deps        # once — pip install -r tests/requirements.txt
-make test             # the merge gate: XRD conformance + golden + invariants
+make test             # the merge gate: XRD conformance + API compat + golden + invariants
 make test-update      # regenerate goldens after an INTENTIONAL change, then read the diff
 make test-structural  # advisory only, never gates
 ```
@@ -170,6 +190,7 @@ make test-structural  # advisory only, never gates
 | `test-xrd` | 0.3s | yes | XRs violating our XRD; negative cases that are *not* rejected |
 | `test-golden` | ~90s | yes | any change to rendered output |
 | `test-invariants` | 0.2s | yes | cross-cutting rules + third-party field contracts |
+| `test-api-compat` | <1s | yes | breaking changes vs the last release tag: removed/retyped/newly-required fields, narrowed enums, renamed composed resources, changed selectors |
 | `test-structural` | ~5s | **no** | third-party structural smoke, best-effort |
 
 A test case is a directory holding up to three inputs:
@@ -203,6 +224,10 @@ tests/cases/<package>/<case>/
   datreeio catalogue, not the operator versions pinned below, so a pass is
   "structurally sane", not "correct". Version-independent guarantees belong in
   `tests/invariants.py` as field contracts instead.
+- **A released XRD is additive-only.** `test-api-compat` diffs every XRD, replays every XR and
+  compares goldens against the last release tag. Crossplane has no conversion between XRD
+  versions, so a new API version is not a way around a breaking change. A deliberate break goes
+  in `tests/api-compat-allow.yaml` with a reason; `make release` then requires release notes.
 - **The catalogue ref is pinned in three places** — `Makefile`
   (`CRDS_CATALOG_REF`), `tests/structural.py` (`CATALOG_REF`), and
   `.pre-commit-config.yaml`. Bump all three together with the reference stack.
@@ -217,12 +242,12 @@ what you expect and the API contract holds — not that it will work in-cluster.
 
 ## Documentation Conventions
 
-Applies to prose paragraphs in `release-notes/`, `ROADMAP.md`, and `docs/` —
+Applies to prose paragraphs in `release-notes/`, `ROADMAP.md`, `README.md`, and `docs/` —
 markdown renders paragraphs as continuous regardless of source line breaks,
 so this is purely about the raw file being comfortable to read in an editor
 or terminal, not about rendered output.
 
-- **Wrap prose around ~100 characters per line, not ~78-80.** The tighter
+- **Wrap prose around ~160 characters per line, not ~100.** The tighter
   wrap breaks lines too often and makes the source choppier to read than
   necessary; a wider column reads more naturally without becoming a single
   giant unwrapped line.
@@ -234,7 +259,11 @@ or terminal, not about rendered output.
 
 ## CI
 
-`.gitea/workflows/publish-packages.yaml` triggers on `v*` tag push, builds all packages in parallel, pushes versioned + `latest` tags, and auto-commits updated install files back to main.
+`.github/workflows/publish-packages.yaml` triggers on a `release-*` tag push. It rebuilds only
+the packages whose `VERSIONS.yaml` `current` equals the tag, pushes `:<release>` and `:latest`,
+and publishes a GitHub release (notes + package table + git-cliff). It commits nothing back:
+`make release` already wrote `VERSIONS.yaml`, `package/install/` and `CHANGELOG.md` into the
+release commit. Gitea no longer publishes.
 
 ## Reference stack
 

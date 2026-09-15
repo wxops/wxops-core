@@ -1,8 +1,12 @@
 name: Validate
 
-# The merge gate. Before this existed, nothing validated a pull request:
-# publish-packages.yaml only triggers on v* tags, and the pre-commit hooks run
+# The merge gate. Before this existed, nothing validated a pull request: the
+# publish workflow only triggers on release tags, and the pre-commit hooks run
 # locally where `--no-verify` bypasses them. Anything could land on main.
+#
+# Kept on Gitea while pull requests still merge here, even though publishing
+# moved to GitHub — mirrors .github/workflows/pr-validate.yaml, kept in sync by
+# hand.
 #
 # PR-only, deliberately: this does not also run on push to main. A merge into
 # main is only reachable through a PR that already passed this gate, so a
@@ -28,7 +32,11 @@ jobs:
     name: Lint and schema
     runs-on: ubuntu-latest
     steps:
+      # Full history: the API compatibility check compares against the last
+      # release tag, and a shallow clone has no tags.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -63,6 +71,15 @@ jobs:
       # the fastest possible signal on an API-contract break.
       - name: XRD conformance
         run: python3 tests/xrd.py
+
+      # A released XRD is additive-only — Crossplane has no conversion between
+      # versions, so a new API version cannot absorb a breaking change. Also
+      # replays released XRs and checks goldens for deleted resources and
+      # changed immutable fields. No Docker, so it runs here.
+      - name: API compatibility vs last release
+        run: |
+          python3 tests/api_compat.py
+          python3 tests/api_compat.py --self-test
 
   # ── Package integrity ──────────────────────────────────────────────────────
   packages:
@@ -104,7 +121,10 @@ jobs:
     # lint or a package build already failed — those fail in seconds.
     needs: [static, packages]
     steps:
+      # Full history: `make test` includes test-api-compat, which needs tags.
       - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
       - uses: actions/setup-python@v5
         with:
@@ -206,30 +226,14 @@ jobs:
           echo "$PWD/.venv/bin" >> "$GITHUB_PATH"
           .venv/bin/pip install --quiet PyYAML
 
-      # A changed package that ships on the old version overwrites a published
-      # OCI tag with different content.
-      - name: VERSIONS.yaml bumped for changed packages
+      # There is no version to bump: `make release` names the release by date
+      # and pins changed packages itself. What a PR must not do is hand-edit
+      # those pins — a manifest pinned to a tag CI never built, or to the wrong
+      # registry, installs nothing.
+      - name: Package pins agree with VERSIONS.yaml
         run: |
-          set -euo pipefail
-          base="origin/${{ github.base_ref }}"
-          git fetch --quiet origin "${{ github.base_ref }}"
-          changed=$(git diff --name-only "$base"...HEAD)
-          echo "$changed" | sed 's/^/  /'
-          fail=0
-          for pkg in gitea-user gitea-org gitea-team gitea-repository \
-                     platform-database-clusters tenant-database tenant-app; do
-            if echo "$changed" | grep -qE "^(package/$pkg/.*\.yaml|kcl/$pkg/main\.k)$"; then
-              before=$(git show "$base:VERSIONS.yaml" | sed -n "/^  $pkg:/,/^  [a-z]/p" | grep current: | awk '{print $2}')
-              after=$(sed -n "/^  $pkg:/,/^  [a-z]/p" VERSIONS.yaml | grep current: | awk '{print $2}')
-              if [ "$before" = "$after" ]; then
-                echo "::error::$pkg changed but VERSIONS.yaml still says $after"
-                fail=1
-              else
-                echo "  $pkg: $before -> $after"
-              fi
-            fi
-          done
-          exit $fail
+          python3 .gitea/scripts/release-state.py check \
+            || { echo "::error::package/install/ and VERSIONS.yaml disagree — both are written by make release"; exit 1; }
 
       - name: README packages table in sync
         run: |
