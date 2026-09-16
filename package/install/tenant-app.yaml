@@ -2,9 +2,7 @@ apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
   name: wxops-core-tenant-app
-  annotations:
-    meta.crossplane.io/version: v0.1.0
 spec:
-  package: gitea.xeusnguyen.xyz/platform-team/wxops-core-tenant-app:v0.2.5
+  package: ghcr.io/wxops/wxops-core/tenant-app:release-2026-09-16
   packagePullPolicy: IfNotPresent
   revisionActivationPolicy: Automatic

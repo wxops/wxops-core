@@ -19,7 +19,12 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 > latest state.
 
 ---
-## [Unreleased]
+## [release-2026-09-16] — 2026-09-16
+
+### CI/CD
+
+- **ci**: Change the package OCI location from org to project ([`b7571fa`](https://github.com/wxops/wxops-core/commit/b7571fafe301c92e937e13e0a89171817c23fbf3))
+
 
 ### Chores
 
@@ -32,6 +37,14 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 - Add new and enhance research about multi-cluster and observability [skip ci] ([`7e81039`](https://github.com/wxops/wxops-core/commit/7e81039d888f6f6b3a1acb5700018c160d9465cb))
 
 
+### Features
+
+- Update release machanism with new format and go oss version ([`5480944`](https://github.com/wxops/wxops-core/commit/548094468efc28234bba1df4de43bb52f13f4287))
+
+
+
+📖 [API reference](https://github.com/wxops/wxops-core/tree/release-2026-09-16/docs) · [`VERSIONS.yaml`](https://github.com/wxops/wxops-core/blob/release-2026-09-16/VERSIONS.yaml)
+🔍 [Diff vs 0.4.0](https://github.com/wxops/wxops-core/compare/v0.4.0...release-2026-09-16)
 ## [0.4.0] — 2026-08-20
 
 ### CI/CD
@@ -256,6 +269,7 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 
 📖 [API reference](https://github.com/wxops/wxops-core/tree/v0.1.0/docs) · [`VERSIONS.yaml`](https://github.com/wxops/wxops-core/blob/v0.1.0/VERSIONS.yaml)
 ---
+[release-2026-09-16]: https://github.com/wxops/wxops-core/releases/tag/release-2026-09-16
 [0.4.0]: https://github.com/wxops/wxops-core/releases/tag/v0.4.0
 [0.3.4]: https://github.com/wxops/wxops-core/releases/tag/v0.3.4
 [0.3.3]: https://github.com/wxops/wxops-core/releases/tag/v0.3.3
@@ -272,5 +286,5 @@ Commit messages follow [Conventional Commits](https://www.conventionalcommits.or
 [0.2.0]: https://github.com/wxops/wxops-core/releases/tag/v0.2.0
 [0.1.1]: https://github.com/wxops/wxops-core/releases/tag/v0.1.1
 [0.1.0]: https://github.com/wxops/wxops-core/releases/tag/v0.1.0
-[Unreleased]: https://github.com/wxops/wxops-core/compare/v0.4.0...HEAD
+[Unreleased]: https://github.com/wxops/wxops-core/compare/release-2026-09-16...HEAD
 

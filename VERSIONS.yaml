@@ -38,7 +38,7 @@ packages:
 
   gitea-user:
     package:
-      current: v0.1.2
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -46,7 +46,7 @@ packages:
 
   gitea-org:
     package:
-      current: v0.1.2
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -54,7 +54,7 @@ packages:
 
   gitea-team:
     package:
-      current: v0.1.2
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -62,7 +62,7 @@ packages:
 
   gitea-repository:
     package:
-      current: v0.1.1
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -70,7 +70,7 @@ packages:
 
   platform-database-clusters:
     package:
-      current: v0.1.5
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -78,7 +78,7 @@ packages:
 
   tenant-database:
     package:
-      current: v0.1.5
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1
@@ -86,7 +86,7 @@ packages:
 
   tenant-app:
     package:
-      current: v0.2.5
+      current: release-2026-09-16
     api:
       served: [v1alpha1]
       storage: v1alpha1

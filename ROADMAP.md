@@ -198,7 +198,7 @@ Consumers pinning to `v1alpha1` should expect churn. This is a real constraint o
 ## Release readiness
 
 **Done.** Phase 0 closed the functional and contract work; this closed out repository readiness for outside contributors, including the first date-named
-release (`release-2026-09-15`, cut with `make release ALL=1`). Pushing the tag and letting CI publish the images is the one remaining, separate step.
+release (`release-2026-09-16`, cut with `make release ALL=1`). Pushing the tag and letting CI publish the images is the one remaining, separate step.
 
 ### Checklist
 
