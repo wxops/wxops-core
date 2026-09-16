@@ -1,4 +1,4 @@
-# wxops-core-platform-database-clusters
+# platform-database-clusters
 
 Crossplane Configuration package that provisions a platform-managed
 [CloudNativePG](https://cloudnative-pg.io/) `Cluster` — the shared PostgreSQL

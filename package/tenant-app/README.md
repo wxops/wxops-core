@@ -1,4 +1,4 @@
-# wxops-core-tenant-app
+# tenant-app
 
 Crossplane Configuration package that provisions a tenant application
 scaffold — `Deployment` + `Service` + optional `Ingress` + optional

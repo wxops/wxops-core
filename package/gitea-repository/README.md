@@ -1,4 +1,4 @@
-# wxops-core-gitea-repository
+# gitea-repository
 
 Crossplane Configuration package that manages a single Gitea repository lifecycle — create, update, and delete — through a Kubernetes-native XR claim.
 
@@ -101,9 +101,9 @@ Use these in downstream scaffolding steps (e.g. seeding the repo with template f
 ```bash
 crossplane xpkg build \
   -f package/gitea-repository \
-  --name wxops-core-gitea-repository
+  --name gitea-repository
 
 crossplane xpkg push \
-  ghcr.io/wxops/wxops-core-gitea-repository:v0.1.0 \
-  -f wxops-core-gitea-repository.xpkg
+  ghcr.io/wxops/wxops-core/gitea-repository:release-YYYY-MM-DD \
+  -f gitea-repository.xpkg
 ```

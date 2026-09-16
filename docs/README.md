@@ -210,7 +210,7 @@ disagree, the ROADMAP wins.
 |---|---|---|---|---|---|
 | **Offline test suite** | Compositions render what you expect; XRs conform to their XRDs | ✅ 19 cases, 18 invariants, 9 negative cases | [`tests/README.md`](../tests/README.md) | `make test`, pre-commit, `pr-validate` | — |
 | **API-compat gate** | A released XRD only grows | ✅ | [Releasing](development/releasing.md#a-released-xrd-only-grows) | `make test-api-compat`, `make release` | — |
-| **Date-named releases** | A dated snapshot; only changed packages rebuilt; notes required when not `safe` | ✅ built · first release not cut | [Releasing](development/releasing.md) | `make release`, `publish-packages` workflow | `make release ALL=1` — moves every install pin to `ghcr.io/wxops` |
+| **Date-named releases** | A dated snapshot; only changed packages rebuilt; notes required when not `safe` | ✅ `release-2026-09-15` cut, tag not yet pushed | [Releasing](development/releasing.md) | `make release`, `publish-packages` workflow | `git push origin release-2026-09-15` — lets CI build and push the `ghcr.io/wxops/wxops-core/*` images |
 | **In-cluster tests** | Provider RBAC, installed CRD versions, real reconciliation | ❌ | [What the suite cannot catch](../tests/README.md#what-this-suite-cannot-catch) | — | No plan yet |
 | **GitOps contract** | Who writes tenant XRs, and where they live | ❌ undecided | [`ROADMAP.md` Backlog](../ROADMAP.md#portal-and-gitops-contract) | — | [Open decision 3](../ROADMAP.md#open-decisions) |
 | **Portal** | The product surface over these APIs (lives outside this repo) | 📋 | [Portal integration](user-guide/portal-integration.md) | — | [Backlog](../ROADMAP.md#portal-and-gitops-contract) |

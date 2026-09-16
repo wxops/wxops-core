@@ -1,14 +1,11 @@
 # W'xOps Core — Roadmap
 
-Latest release: **v0.4.0**. Seven Configuration packages published. From the next release on,
-releases are named by date — `release-YYYY-MM-DD` — and compatibility is carried by the XRD API
-version, held additive-only by `tests/api_compat.py`; see
-[`release-notes/README.md`](release-notes/README.md).
+Latest release: **v0.4.0**. Seven Configuration packages published. From the next release on, releases are named by date — `release-YYYY-MM-DD` — and
+compatibility is carried by the XRD API version, held additive-only by `tests/api_compat.py`; see [`release-notes/README.md`](release-notes/README.md).
 
 This document sequences the remaining core work and defines what "core is done" means.
 
-The organising thesis: **core is finished when its API contract is stable, not
-when its feature list is complete.** The portal will bind to these XRD shapes;
+The organising thesis: **core is finished when its API contract is stable, not when its feature list is complete.** The portal will bind to these XRD shapes;
 everything that changes after that binding costs twice.
 
 ---
@@ -63,18 +60,15 @@ everything that changes after that binding costs twice.
 | Release mechanism — date-named releases, API-compat gate, pins written by `make release` | 🔶 Built; `package/install/` still pins the legacy Gitea registry until `make release ALL=1` runs — [Release readiness](#release-readiness) |
 | Darlane `tunneling` (mirrord labels) | ⚪ Open, low value — the CLI works without it |
 
-Core's functional and contract surface is done — Phase 0 closed that out (shipped as `v0.4.0`, see
-[Shipped](#shipped)). What's open now is getting the release mechanism actually used
-([Release readiness](#release-readiness)). Everything past that — portal, GitOps contract,
-multi-cluster, Guardian, Darlane extraction — lives in the [Backlog](#backlog): real work, tracked,
-but not scheduled against this repo's own critical path.
+Core's functional and contract surface is done — Phase 0 closed that out (shipped as `v0.4.0`, see [Shipped](#shipped)). What's open now is getting the release
+mechanism actually used ([Release readiness](#release-readiness)). Everything past that — portal, GitOps contract, multi-cluster, Guardian, Darlane extraction —
+lives in the [Backlog](#backlog): real work, tracked, but not scheduled against this repo's own critical path.
 
 ---
 
 ## Notes and warnings
 
-Things Phase 0 shipped that are easy to forget later, because nothing fails loudly when they're
-missed.
+Things Phase 0 shipped that are easy to forget later, because nothing fails loudly when they're missed.
 
 - **`monitoring.coreos.com` RBAC is a manual, per-cluster step.** Shipped in `v0.4.0`, but no
   package bump carries it: apply the updated `providers/rbac-provider-kubernetes.yaml` on every
@@ -96,20 +90,17 @@ missed.
 
 ## The cut line
 
-Core is done when a portal can be built against it without needing core to change
-again. Concretely:
+Core is done when a portal can be built against it without needing core to change again. Concretely:
 
 1. Every XRD reports machine-readable readiness.
 2. Readiness means what a user would assume it means.
 3. Every action the portal offers has an authorisation surface.
 4. The served API version is the one we intend to keep.
 
-Items 1–3 were Phase 0's scope, shipped as `v0.4.0` — see [Shipped](#shipped) for what landed and
-[Notes and warnings](#notes-and-warnings) for what to watch. Item 4 is a decision, not a task, and
-it is the only genuinely irreversible one.
+Items 1–3 were Phase 0's scope, shipped as `v0.4.0` — see [Shipped](#shipped) for what landed and [Notes and warnings](#notes-and-warnings) for what to watch.
+Item 4 is a decision, not a task, and it is the only genuinely irreversible one.
 
-Everything after Phase 0 — `XDarlane`, Guardian, multi-cluster — is deferrable
-without blocking portal work.
+Everything after Phase 0 — `XDarlane`, Guardian, multi-cluster — is deferrable without blocking portal work.
 
 ```mermaid
 flowchart TD
@@ -128,28 +119,21 @@ flowchart TD
     class BL,RJ unscheduled
 ```
 
-Phase 0 was the only item on core's own critical path, and it's done — everything below is either in
-progress (release readiness) or deferred to the Backlog.
+Phase 0 was the only item on core's own critical path, and it's done — everything below is either in progress (release readiness) or deferred to the Backlog.
 
 ---
 
 ## Out of scope — what W'xOps Core is not
 
-This project is a **Crossplane Configuration library**. It defines XRDs and
-Compositions that render Kubernetes objects. That is the whole remit.
+This project is a **Crossplane Configuration library**. It defines XRDs and Compositions that render Kubernetes objects. That is the whole remit.
 
-The list below is not a backlog. These are things W'xOps Core will **not** do,
-and requests to add them should be redirected to the named alternative rather
-than accepted. Keeping this boundary is what stops the repo becoming a platform
-monolith.
+The list below is not a backlog. These are things W'xOps Core will **not** do, and requests to add them should be redirected to the named alternative rather
+than accepted. Keeping this boundary is what stops the repo becoming a platform monolith.
 
 ### Not a controller
 
-**No hand-written Go controllers.** A `kubebuilder` controller was built,
-evaluated, and removed. Composition logic belongs in KCL or
-patch-and-transform, run by Crossplane's own reconciler. If something cannot be
-expressed as a composition, the answer is a new Crossplane *function*, not a
-bespoke operator.
+**No hand-written Go controllers.** A `kubebuilder` controller was built, evaluated, and removed. Composition logic belongs in KCL or patch-and-transform, run
+by Crossplane's own reconciler. If something cannot be expressed as a composition, the answer is a new Crossplane *function*, not a bespoke operator.
 
 ### Not a runtime
 
@@ -174,17 +158,14 @@ Core **composes** other operators. It does not reimplement them.
 | Cluster provisioning | Cluster API |
 | Identity federation | Pinniped / native structured authentication |
 
-`providers/policies/darlane-ttl.yaml` is the deliberate exception, and it is a
-*reference* policy shipped alongside the composition it enforces — not the start
+`providers/policies/darlane-ttl.yaml` is the deliberate exception, and it is a *reference* policy shipped alongside the composition it enforces — not the start
 of a policy library.
 
 ### Not a networking layer
 
-Traefik `IngressRoute` for north-south traffic only. **No service mesh, no
-east-west routing, no cross-cluster data plane.** See
-[`docs/core-ideas/multi-cluster.md`](docs/core-ideas/multi-cluster.md#layer-3--data-plane) — a mesh is
-a Layer 3 concern the platform defers until a concrete workload needs it, and
-Darlane traffic splitting is deliberately confined to a single cluster.
+Traefik `IngressRoute` for north-south traffic only. **No service mesh, no east-west routing, no cross-cluster data plane.** See
+[`docs/core-ideas/multi-cluster.md`](docs/core-ideas/multi-cluster.md#layer-3--data-plane) — a mesh is a Layer 3 concern the platform defers until a concrete
+workload needs it, and Darlane traffic splitting is deliberately confined to a single cluster.
 
 ### Not the product surface
 
@@ -195,8 +176,7 @@ Darlane traffic splitting is deliberately confined to a single cluster.
 | Guardian sidecar images | Separate repository |
 | Tenant application code | Tenant repositories |
 
-See [Where Darlane belongs](#where-darlane-belongs) for the reasoning — the seam
-is artifact type, not feature.
+See [Where Darlane belongs](#where-darlane-belongs) for the reasoning — the seam is artifact type, not feature.
 
 ### Not portable beyond Kubernetes + Crossplane
 
@@ -210,19 +190,15 @@ is artifact type, not feature.
 
 ### Not stable yet
 
-All seven XRDs serve `v1alpha1`. **Breaking schema changes are permitted without
-a deprecation cycle** until the promotion in [decision 1](#open-decisions).
-Consumers pinning to `v1alpha1` should expect churn. This is a real constraint on
-the portal and the reason API promotion is Phase 0 work rather than later.
+All seven XRDs serve `v1alpha1`. **Breaking schema changes are permitted without a deprecation cycle** until the promotion in [decision 1](#open-decisions).
+Consumers pinning to `v1alpha1` should expect churn. This is a real constraint on the portal and the reason API promotion is Phase 0 work rather than later.
 
 ---
 
 ## Release readiness
 
-**Everything is decided and built except one command.** Phase 0 closed the functional and contract
-work; this closed out repository readiness for outside contributors. The only thing left is running
-`make release ALL=1` — deliberately not run yet, since it requires a commit and a push, both the
-user's call.
+**Done.** Phase 0 closed the functional and contract work; this closed out repository readiness for outside contributors, including the first date-named
+release (`release-2026-09-15`, cut with `make release ALL=1`). Pushing the tag and letting CI publish the images is the one remaining, separate step.
 
 ### Checklist
 
@@ -236,12 +212,13 @@ user's call.
 - [x] `CODE_OF_CONDUCT.md` — Contributor Covenant v2.1, reports via the same private advisory channel
 - [x] `.github/` — `pr-validate.yaml` mirrors the Gitea gate; `publish-packages.yaml`
       builds/pushes/releases on a `release-*` tag
-- [x] Public registry decided — `ghcr.io/wxops`; `Makefile` and `release-state.py` agree
+- [x] Public registry decided — `ghcr.io/wxops/wxops-core`; `Makefile` and `release-state.py` agree
 - [x] `cliff.toml` repointed from Gitea to GitHub, for the whole changelog at once
-- [x] **Public package naming decided and done** — `platform-wxops-*` → `wxops-core-*`, matching the
-      repo name. Renamed across `crossplane.yaml` (`metadata.name`), `package/install/*.yaml`,
-      `Makefile`, `.gitea/scripts/{release-state.py,validate-packages.sh}`,
-      `.github/workflows/publish-packages.yaml`, and every package `README.md`. Verified:
+- [x] **Public package naming decided and done** — `platform-wxops-<pkg>` → `wxops-core-<pkg>` →
+      scoped by registry path instead: `ghcr.io/wxops/wxops-core/<pkg>`, plain `<pkg>` everywhere
+      else (`crossplane.yaml` `metadata.name`, `package/install/*.yaml`, `Makefile`,
+      `.gitea/scripts/{release-state.py,validate-packages.sh}`,
+      `.github/workflows/publish-packages.yaml`, every package `README.md`). Verified:
       `make test-xrd test-api-compat test-invariants`, `make readme-check`, and
       `release-state.py check` all still pass.
 - [x] Mirror strategy decided — Gitea primary through `v0.4.0`; GitHub primary from the first
@@ -255,21 +232,22 @@ user's call.
       improvement, deliberately **not done now** — tracked below, not blocking this release.
 - [x] `CLAUDE.md` ships publicly — decided. Audited for anything sensitive first: no Gitea hostname,
       no SSH port, no personal information anywhere in the file.
-- [ ] **Run `make release ALL=1`** — the one remaining action, and the only one that needs a commit.
-      Moves all seven `package/install/*.yaml` pins from the Gitea registry to `ghcr.io/wxops` in one
-      release. Everything above it is done; this one is the user's call, not run automatically.
+- [x] **Run `make release ALL=1`** — done, `release-2026-09-15`. Moved all seven
+      `package/install/*.yaml` pins from the Gitea registry to `ghcr.io/wxops/wxops-core` in one
+      release. The tag is cut locally; pushing it (`git push origin release-2026-09-15`) and letting
+      `publish-packages.yaml` build and push the images is the next, separate step.
 
 ### Decided
 
 | Decision | Outcome |
 |---|---|
 | Licence | Apache-2.0 — patent grant, trademark reservation, ecosystem-compatible |
-| Public registry | `ghcr.io/wxops` |
-| Public package naming | `wxops-core-<pkg>`, replacing `platform-wxops-<pkg>` everywhere it appeared |
+| Public registry | `ghcr.io/wxops/wxops-core` |
+| Public package naming | Plain `<pkg>`, scoped by the registry path (`ghcr.io/wxops/wxops-core/<pkg>`) |
 | Mirror strategy | GitHub primary from the first date-named release; Gitea archived, no further pushes |
 | CHANGELOG link target | GitHub, for the whole file — every entry from `v0.1.0` through `v0.4.0` links there |
 | Release naming | Date-named — `release-YYYY-MM-DD[.N]`, UTC. Compatibility lives in the XRD API version, not the release name — `tests/api_compat.py` holds it additive-only. See [`release-notes/README.md`](release-notes/README.md). |
-| Gitea hostname visibility | Deliberately public — the instance is permission-gated, so the hostname alone isn't sensitive. The exact SSH port is never published, on the same access-control reasoning, as a cheap scan-reduction measure. The only place the hostname still appears is `package/install/*.yaml`'s legacy registry pins, which `make release ALL=1` replaces. |
+| Gitea hostname visibility | Deliberately public — the instance is permission-gated, so the hostname alone isn't sensitive. The exact SSH port is never published, on the same access-control reasoning, as a cheap scan-reduction measure. `package/install/*.yaml`'s legacy registry pins were the only place it appeared, and `make release ALL=1` (`release-2026-09-15`) has since replaced them all. |
 | `CLAUDE.md` publication | Ships publicly, unedited — audited clean of hostnames, ports, and personal information |
 
 ### Still open
@@ -283,16 +261,13 @@ user's call.
 
 ## Backlog
 
-**Tracked, not scheduled.** Nothing here has a commitment to ship or a target
-release. Items graduate into a phase when a concrete need appears — they are not
-worked through in order, and an item sitting here for a year is a normal outcome,
-not a slipped deadline.
+**Tracked, not scheduled.** Nothing here has a commitment to ship or a target release. Items graduate into a phase when a concrete need appears — they are not
+worked through in order, and an item sitting here for a year is a normal outcome, not a slipped deadline.
 
 ### Portal and GitOps contract
 
-The portal is a separate repository ([Not the product surface](#not-the-product-surface)) and is
-unblocked by Phase 0: the status fields it polls and the authorisation surface it needs already
-exist. What it writes, and where, is the open question:
+The portal is a separate repository ([Not the product surface](#not-the-product-surface)) and is unblocked by Phase 0: the status fields it polls and the
+authorisation surface it needs already exist. What it writes, and where, is the open question:
 
 | Model | Portal writes | Git holds | Trade-off |
 |---|---|---|---|
@@ -300,9 +275,8 @@ exist. What it writes, and where, is the open question:
 | **Portal → API** | The XR directly | Platform config only | Immediate feedback, weaker audit |
 | **Hybrid** | API for dev, Git for prod | Prod XRs | Best UX/safety split, two code paths |
 
-Also in scope once this starts: repository layout for tenant XRs, ApplicationSet patterns for
-per-environment promotion, and where `package/install` sits relative to tenant state. Tracked as
-[open decision 3](#open-decisions).
+Also in scope once this starts: repository layout for tenant XRs, ApplicationSet patterns for per-environment promotion, and where `package/install` sits
+relative to tenant state. Tracked as [open decision 3](#open-decisions).
 
 ### Deferred core (post-release)
 
@@ -324,8 +298,8 @@ In priority order, all post-portal:
 
 ### Core follow-ups from the architecture docs (2026-08)
 
-Safe-tier, additive package changes argued in the docs family — see
-[`docs/core-ideas/solution-matrix.md`](docs/core-ideas/solution-matrix.md) for the full picture:
+Safe-tier, additive package changes argued in the docs family — see [`docs/core-ideas/solution-matrix.md`](docs/core-ideas/solution-matrix.md) for the full
+picture:
 
 - [ ] **`status.notReady` reasons** on all seven packages — the composition
       already computes per-resource readiness and discards it; exposing it is
@@ -350,8 +324,7 @@ Safe-tier, additive package changes argued in the docs family — see
 
 ### Vault Database Secrets Engine
 
-Dynamic credential management via Vault's Database Secrets Engine. The current
-static flow — CNPG creates credentials → ESO `PushSecret` → Vault KV2 — **remains
+Dynamic credential management via Vault's Database Secrets Engine. The current static flow — CNPG creates credentials → ESO `PushSecret` → Vault KV2 — **remains
 the default**. This would layer on top as an opt-in path, not replace it.
 
 - [ ] **Design mount/path topology** — single mount per cluster vs. per-tenant
@@ -371,16 +344,14 @@ the default**. This would layer on top as an opt-in path, not replace it.
       `XPlatformDatabaseCluster` (requires `provider-vault`) so platform admins
       do not need to pre-create Vault mounts out of band.
 
-Interacts with [Vault path conventions](docs/core-ideas/multi-cluster.md#decisions-to-make-before-building):
-if a cluster dimension is ever added to Vault paths, settle it before this ships,
-not after.
+Interacts with [Vault path conventions](docs/core-ideas/multi-cluster.md#decisions-to-make-before-building): if a cluster dimension is ever added to Vault
+paths, settle it before this ships, not after.
 
 ---
 
 ## Decided and rejected
 
-Evaluated and closed. **Do not re-litigate without new information** — if
-something here comes up again, the burden is to say what changed.
+Evaluated and closed. **Do not re-litigate without new information** — if something here comes up again, the burden is to say what changed.
 
 | Rejected | Why |
 |---|---|
@@ -401,8 +372,8 @@ something here comes up again, the burden is to say what changed.
 
 ## Shipped
 
-Release history from `v0.1.0` through `v0.4.0` (the Phase 0 / API-freeze release). Full commit-level
-detail is in [`CHANGELOG.md`](CHANGELOG.md); this table is what shipped, not how.
+Release history from `v0.1.0` through `v0.4.0` (the Phase 0 / API-freeze release). Full commit-level detail is in [`CHANGELOG.md`](CHANGELOG.md); this table is
+what shipped, not how.
 
 | Release | Theme | Highlights |
 |---|---|---|
@@ -414,15 +385,13 @@ detail is in [`CHANGELOG.md`](CHANGELOG.md); this table is what shipped, not how
 | `v0.3.1` – `v0.3.4` | Darlane header routing, hardened | `headerRouting` shipped in `v0.3.1`, then three fix releases: priority calculation, a separate `IngressRoute` object per rule, syntax correctness |
 | `v0.4.0` | **Phase 0 — API freeze** | Status parity (`created`/`ready`) on all seven XRDs, `tenant-app` readiness split, Darlane status block, `targetCluster` threaded through all three KCL packages, `monitoring` block emitting real `ServiceMonitor`/`PodMonitor` |
 
-`darlane.rbac` was sketched in the `v0.3.0` design but never implemented in the XRD or KCL — see
-[Decided and rejected](#decided-and-rejected).
+`darlane.rbac` was sketched in the `v0.3.0` design but never implemented in the XRD or KCL — see [Decided and rejected](#decided-and-rejected).
 
 ---
 
 ## Where Darlane belongs
 
-Splitting Darlane out is right, but the seam should be **artifact type, not
-feature**.
+Splitting Darlane out is right, but the seam should be **artifact type, not feature**.
 
 | Artifact | Home | Why |
 |---|---|---|
@@ -431,25 +400,18 @@ feature**.
 | Guardian sidecar images | **Separate repo** | Container images, not YAML |
 | Portal Darlane UI | **Portal repo** | Obviously |
 
-The reasoning: this repo's entire toolchain — KCL embedding, `xpkg build`, the
-drift check, the API-compat gate — exists to build Configuration packages. An
-`XDarlane` XRD gets all of it for free. A CLI gets none of it and pays the
-overhead of a YAML-shaped repo.
+The reasoning: this repo's entire toolchain — KCL embedding, `xpkg build`, the drift check, the API-compat gate — exists to build Configuration packages. An
+`XDarlane` XRD gets all of it for free. A CLI gets none of it and pays the overhead of a YAML-shaped repo.
 
-There is also a coupling argument. `XDarlane` will need to reference the app it
-shadows — its namespace, secrets, Service, and Traefik routes. Today those are
-`XTenantApp` internals. Cross-repo coordination between two Crossplane
-Configurations that must agree on label and annotation conventions is a real cost
-with no offsetting benefit at seven packages.
+There is also a coupling argument. `XDarlane` will need to reference the app it shadows — its namespace, secrets, Service, and Traefik routes. Today those are
+`XTenantApp` internals. Cross-repo coordination between two Crossplane Configurations that must agree on label and annotation conventions is a real cost with no
+offsetting benefit at seven packages.
 
-**Recommendation: do not split now.** Keep `darlane.*` on `XTenantApp` through
-portal v1. Extract `package/darlane/` once the portal has shown which
-Darlane operations are actually used. Move the CLI and Guardian images out
-whenever they are written — those never belonged here.
+**Recommendation: do not split now.** Keep `darlane.*` on `XTenantApp` through portal v1. Extract `package/darlane/` once the portal has shown which Darlane
+operations are actually used. Move the CLI and Guardian images out whenever they are written — those never belonged here.
 
-This also matches the current direction of travel: `providers/policies/darlane-ttl.yaml`
-already lives here as platform policy, and it belongs with the composition it
-enforces.
+This also matches the current direction of travel: `providers/policies/darlane-ttl.yaml` already lives here as platform policy, and it belongs with the
+composition it enforces.
 
 ---
 

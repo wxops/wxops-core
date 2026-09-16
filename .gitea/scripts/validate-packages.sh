@@ -28,7 +28,7 @@ echo ""
 
 for pkg in "${PACKAGES[@]}"; do
   pkg_dir="$ROOT_DIR/package/$pkg"
-  out="$TMPDIR/wxops-core-$pkg.xpkg"
+  out="$TMPDIR/$pkg.xpkg"
 
   printf "  %-24s" "$pkg"
 

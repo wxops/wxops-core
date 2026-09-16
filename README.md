@@ -3,15 +3,22 @@
 ***"Ask Kubernetes for a Gitea user, a PostgreSQL database, or a full application deployment — get a real one back."***
 
 > [!NOTE]
-> W'xOps Core is a library of [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages: each one defines a schema (an `XRD`) and the logic that turns it into real infrastructure (a `Composition`), so `kubectl apply -f my-app.yaml` provisions a Gitea account, a CloudNativePG database, or a Deployment/Service/IngressRoute stack — no custom controller, no platform UI required to use it.
+> W'xOps Core is a library of [Crossplane v2](https://docs.crossplane.io/v2.3/) Configuration packages: each one defines a schema (an `XRD`) and the logic that
+> turns it into real infrastructure (a `Composition`), so `kubectl apply -f my-app.yaml` provisions a Gitea account, a CloudNativePG database, or a
+> Deployment/Service/IngressRoute stack — no custom controller, no platform UI required to use it.
 
 ## The problem this solves
 
-Standing up a new tenant app or database today usually means: click through Gitea's UI to create a repo, hand-write Terraform for the database, copy-paste a Deployment Service/Ingress from the last app that looked similar, and wire the secrets together by hand. Every step is a manual, undocumented, tribal-knowledge operation.
+Standing up a new tenant app or database today usually means: click through Gitea's UI to create a repo, hand-write Terraform for the database, copy-paste a
+Deployment Service/Ingress from the last app that looked similar, and wire the secrets together by hand. Every step is a manual, undocumented, tribal-knowledge
+operation.
 
-W'xOps Core turns each of those into a Kubernetes object with a schema: `XGiteaUser`, `XTenantDatabase`, `XTenantApp`, and four more. Crossplane reconciles them the same way it reconciles anything else — continuously, declaratively, with `status` fields you can poll instead of watching a Terraform apply scroll by. What actually executes underneath (Terraform against a Gitea provider, or Kubernetes objects composed via KCL) is an implementation detail the schema hides.
+W'xOps Core turns each of those into a Kubernetes object with a schema: `XGiteaUser`, `XTenantDatabase`, `XTenantApp`, and four more. Crossplane reconciles them
+the same way it reconciles anything else — continuously, declaratively, with `status` fields you can poll instead of watching a Terraform apply scroll by. What
+actually executes underneath (Terraform against a Gitea provider, or Kubernetes objects composed via KCL) is an implementation detail the schema hides.
 
-This repo is **only the Configuration packages** — the schemas and the composition logic. It has no UI, no CLI, and no build pipeline; **see [Out of scope](ROADMAP.md#out-of-scope--what-wxops-core-is-not) for the deliberate boundary.**
+This repo is **only the Configuration packages** — the schemas and the composition logic. It has no UI, no CLI, and no build pipeline; **see [Out of
+scope](ROADMAP.md#out-of-scope--what-wxops-core-is-not) for the deliberate boundary.**
 
 ---
 **Table of Contents**
@@ -49,13 +56,15 @@ This repo is **only the Configuration packages** — the schemas and the composi
 > [!TIP]
 > `random-password` lives in `package/random-password/` as a utility composition and examples, and it will not published as OCI Artifact.
 
-Served XRD API versions, and the release each package last changed in, are tracked in [`VERSIONS.yaml`](VERSIONS.yaml). Releases are named by date — `release-YYYY-MM-DD` — and compatibility is the API version, not the release name; see [`docs/development/releasing.md`](docs/development/releasing.md).
+Served XRD API versions, and the release each package last changed in, are tracked in [`VERSIONS.yaml`](VERSIONS.yaml). Releases are named by date —
+`release-YYYY-MM-DD` — and compatibility is the API version, not the release name; see [`docs/development/releasing.md`](docs/development/releasing.md).
 
 ---
 
 ## Documentation
 
-Everything is linked from one hub, [`docs/README.md`](docs/README.md), which also holds the **development matrix**: every package, core idea and delivery mechanism, where it stands, and what is next.
+Everything is linked from one hub, [`docs/README.md`](docs/README.md), which also holds the **development matrix**: every package, core idea and delivery
+mechanism, where it stands, and what is next.
 
 | Section | For | Start with |
 |---|---|---|
@@ -70,7 +79,9 @@ Everything is linked from one hub, [`docs/README.md`](docs/README.md), which als
 
 ![W'xOps Core on Crossplane — the runtime (RBAC manager), the definitions layer (Providers, Functions and Configurations composing into XRDs and Compositions), and a composite resource fanning out to real Kubernetes, database and cloud resources](images/w'xops-core-crossplane.png)
 
-The shape above is what every package in this repo is an instance of — a `Configuration` package contributing an `XRD` + `Composition`, which a `CompositeResourceDefinition` turns into a composite resource (XR) that Crossplane creates and reconciles against real infrastructure. It's a structural map, not a substitute for [Crossplane's own docs](https://docs.crossplane.io/v2.3/) — read those for what each piece actually does.
+The shape above is what every package in this repo is an instance of — a `Configuration` package contributing an `XRD` + `Composition`, which a
+`CompositeResourceDefinition` turns into a composite resource (XR) that Crossplane creates and reconciles against real infrastructure. It's a structural map,
+not a substitute for [Crossplane's own docs](https://docs.crossplane.io/v2.3/) — read those for what each piece actually does.
 
 The previous direction used `kubebuilder` to build a controller from scratch. That was **rejected** — too much complexity for the problem.
 
@@ -79,7 +90,8 @@ The current approach combines two tools with clear roles:
 - **Crossplane** owns the platform API layer: `XRD`s define the schema, `Composition`s wire them to infrastructure, and the control loop reconciles desired state.
 - **Terraform** (via `provider-terraform`) owns the infrastructure execution: each `Workspace` resource runs a plan/apply cycle in-cluster against a Gitea Terraform provider.
 
-Composition functions may be written in Python, Go, CEL, KCL, or Go templating. The `kcl/` directory holds KCL-based composition logic for `platform-database-clusters`, `tenant-database`, and `tenant-app` — see [KCL composition functions](#kcl-composition-functions) below.
+Composition functions may be written in Python, Go, CEL, KCL, or Go templating. The `kcl/` directory holds KCL-based composition logic for
+`platform-database-clusters`, `tenant-database`, and `tenant-app` — see [KCL composition functions](#kcl-composition-functions) below.
 
 ---
 
@@ -155,7 +167,8 @@ kubectl apply -f examples/gitea-user/xr.yaml
 kubectl get xgiteausers
 ```
 
-Prerequisites, the platform dependencies each package needs, credential formats and uninstalling are in the [setup guide](docs/user-guide/setup.md). What each resource does once it exists is in the [API reference](docs/api-reference/README.md).
+Prerequisites, the platform dependencies each package needs, credential formats and uninstalling are in the [setup guide](docs/user-guide/setup.md). What each
+resource does once it exists is in the [API reference](docs/api-reference/README.md).
 
 ---
 
@@ -167,23 +180,29 @@ pre-commit install --hook-type pre-push --hook-type commit-msg
 make test-deps && make test        # the offline merge gate — no cluster needed
 ```
 
-Every hook, every make target and the rules that bite are in the [development guide](docs/development/README.md); the change loop and the new-package checklist are in [CONTRIBUTING.md](CONTRIBUTING.md).
+Every hook, every make target and the rules that bite are in the [development guide](docs/development/README.md); the change loop and the new-package checklist
+are in [CONTRIBUTING.md](CONTRIBUTING.md).
 
 ---
 
 ## KCL composition functions
 
-`platform-database-clusters`, `tenant-database`, and `tenant-app` use [`function-kcl`](https://github.com/crossplane-contrib/function-kcl) instead of `function-go-templating`, since their Compositions need real branching/looping across multiple optional resources (conditional resource sets, dict merges, list comprehensions over arrays like `managedRoles[]`, and — for `tenant-app` — composing a nested `XTenantDatabase` XR). The other packages (`gitea-*`, `random-password`) are simple enough that inline HCL / Go templating is sufficient.
+`platform-database-clusters`, `tenant-database`, and `tenant-app` use [`function-kcl`](https://github.com/crossplane-contrib/function-kcl) instead of
+`function-go-templating`, since their Compositions need real branching/looping across multiple optional resources (conditional resource sets, dict merges, list
+comprehensions over arrays like `managedRoles[]`, and — for `tenant-app` — composing a nested `XTenantDatabase` XR). The other packages (`gitea-*`,
+`random-password`) are simple enough that inline HCL / Go templating is sufficient.
 
 `kcl/{pkg}/main.k` is the source of truth and is embedded into `package/{pkg}/composition.yaml` via `make kcl-sync` / `make kcl-check`.
 
-See [`kcl/README.md`](kcl/README.md) for why KCL vs Go templating, the sync workflow, how to wire a new KCL module into an XRD, and the deferred OCI-modules migration plan.
+See [`kcl/README.md`](kcl/README.md) for why KCL vs Go templating, the sync workflow, how to wire a new KCL module into an XRD, and the deferred OCI-modules
+migration plan.
 
 ---
 
 ## Versioning and releases
 
-Two axes, never mixed: the **XRD API version** (`platform.wxops.cloud/v1alpha1`) is the contract that dev XRs, prod XRs and the portal bind to, and it only ever grows once released; the **release** (`release-YYYY-MM-DD`) is a dated snapshot of the packages that changed.
+Two axes, never mixed: the **XRD API version** (`platform.wxops.cloud/v1alpha1`) is the contract that dev XRs, prod XRs and the portal bind to, and it only ever
+grows once released; the **release** (`release-YYYY-MM-DD`) is a dated snapshot of the packages that changed.
 
 ```bash
 make release           # gate → pin changed packages → CHANGELOG.md → commit + tag release-YYYY-MM-DD
@@ -220,7 +239,8 @@ make test-deps    # once
 make test         # XRD conformance + API compat + golden render tests + invariants
 ```
 
-`crossplane composition render` runs the real function images in Docker, so the unit under test is the composition itself. See [tests/README.md](tests/README.md) for what that covers and, importantly, what it does not.
+`crossplane composition render` runs the real function images in Docker, so the unit under test is the composition itself. See
+[tests/README.md](tests/README.md) for what that covers and, importantly, what it does not.
 
 This project has a [Code of Conduct](CODE_OF_CONDUCT.md). Found a vulnerability? See [SECURITY.md](SECURITY.md) for how to report it privately.
 
@@ -246,4 +266,5 @@ See the License for the specific language governing permissions and
 limitations under the License.
 ```
 
-Third-party components composed by this project are listed in [`NOTICE`](NOTICE), which redistributors must preserve under Section 4(d) of the License. The W'xOps name and marks are not granted by the License — see Section 6.
+Third-party components composed by this project are listed in [`NOTICE`](NOTICE), which redistributors must preserve under Section 4(d) of the License. The
+W'xOps name and marks are not granted by the License — see Section 6.
