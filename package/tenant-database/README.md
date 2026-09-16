@@ -1,4 +1,4 @@
-# wxops-core-tenant-database
+# tenant-database
 
 Crossplane Configuration package that provisions a tenant-facing PostgreSQL
 database on a platform [`XPlatformDatabaseCluster`](../platform-database-clusters/),

@@ -1,7 +1,7 @@
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: wxops-core-gitea-repository
+  name: gitea-repository
   annotations:
     meta.crossplane.io/maintainer: W'xOps Platform Team
     meta.crossplane.io/description: Manages a single Gitea repository lifecycle via Crossplane.

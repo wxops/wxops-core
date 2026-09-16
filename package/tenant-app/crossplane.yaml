@@ -1,7 +1,7 @@
 apiVersion: meta.pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: wxops-core-tenant-app
+  name: tenant-app
   annotations:
     meta.crossplane.io/maintainer: W'xOps Platform Team
     meta.crossplane.io/description: Tenant application scaffold (Deployment, Service, Ingress, optional Darlane) with secretsFrom wiring, cert-manager TLS, and oauth2-proxy SSO.

@@ -55,7 +55,7 @@ git push origin main && git push origin release-YYYY-MM-DD
 - **Name.** A release is named by UTC date; a second release on the same day becomes
   `release-YYYY-MM-DD.2`.
 - **Rebuild everything.** `make release ALL=1` rebuilds every package. The first date-named release
-  needs it, to move every install pin to `ghcr.io/wxops`.
+  needed it, to move every install pin to `ghcr.io/wxops/wxops-core`.
 - **Check pins.** `make release-check` verifies that `VERSIONS.yaml` and `package/install/` agree.
 
 ## What CI does on the tag
@@ -63,7 +63,7 @@ git push origin main && git push origin release-YYYY-MM-DD
 [`.github/workflows/publish-packages.yaml`](../../.github/workflows/publish-packages.yaml):
 
 1. Builds only the packages whose `VERSIONS.yaml` `current` equals the tag.
-2. Pushes `<image>:<release>` and `<image>:latest` to `ghcr.io/wxops`.
+2. Pushes `<image>:<release>` and `<image>:latest` to `ghcr.io/wxops/wxops-core`.
 3. Publishes a GitHub release: your notes, a package table with change tiers, and the git-cliff
    changelog.
 

@@ -1,4 +1,4 @@
-# wxops-core-gitea-org
+# gitea-org
 
 Crossplane Configuration package that manages a single Gitea organization lifecycle — create, update, and delete — through a Kubernetes-native XR claim.
 
@@ -95,9 +95,9 @@ XGiteaOrg (team-alpha)
 ```bash
 crossplane xpkg build \
   -f package/gitea-org \
-  --name wxops-core-gitea-org
+  --name gitea-org
 
 crossplane xpkg push \
-  ghcr.io/wxops/wxops-core-gitea-org:v0.1.0 \
-  -f wxops-core-gitea-org.xpkg
+  ghcr.io/wxops/wxops-core/gitea-org:release-YYYY-MM-DD \
+  -f gitea-org.xpkg
 ```

@@ -1,4 +1,4 @@
-# wxops-core-gitea-team
+# gitea-team
 
 Crossplane Configuration package that manages a Gitea team and its membership within an organization through a Kubernetes-native XR claim.
 
@@ -115,9 +115,9 @@ Crossplane reconciles the diff and calls the Gitea API. No manual Gitea UI inter
 ```bash
 crossplane xpkg build \
   -f package/gitea-team \
-  --name wxops-core-gitea-team
+  --name gitea-team
 
 crossplane xpkg push \
-  ghcr.io/wxops/wxops-core-gitea-team:v0.1.0 \
-  -f wxops-core-gitea-team.xpkg
+  ghcr.io/wxops/wxops-core/gitea-team:release-YYYY-MM-DD \
+  -f gitea-team.xpkg
 ```

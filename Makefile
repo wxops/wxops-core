@@ -1,4 +1,4 @@
-REGISTRY ?= ghcr.io/wxops
+REGISTRY ?= ghcr.io/wxops/wxops-core
 
 # datreeio CRDs-catalog ref used for third-party schema lookups. PINNED on
 # purpose: tracking `main` would let upstream change what CI accepts with no
@@ -16,17 +16,17 @@ build: ## Build all Crossplane OCI packages locally (.xpkg files)
 		echo "→ building package/$$pkg"; \
 		crossplane xpkg build \
 			-f package/$$pkg \
-			-o wxops-core-$$pkg.xpkg \
+			-o $$pkg.xpkg \
 			--ignore kustomization.yaml; \
 	done
 
 .PHONY: push
 push: build ## Build and push all packages to the registry
 	@for pkg in $(PACKAGES); do \
-		echo "→ pushing wxops-core-$$pkg:$(VERSION)"; \
+		echo "→ pushing $$pkg:$(VERSION)"; \
 		crossplane xpkg push \
-			$(REGISTRY)/wxops-core-$$pkg:$(VERSION) \
-			-f wxops-core-$$pkg.xpkg; \
+			$(REGISTRY)/$$pkg:$(VERSION) \
+			-f $$pkg.xpkg; \
 	done
 
 .PHONY: validate

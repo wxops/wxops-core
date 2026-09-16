@@ -7,7 +7,7 @@ A release is named release-YYYY-MM-DD (UTC; .2, .3 … for a second one that day
 write that decision into the tree before the tag is cut:
 
   VERSIONS.yaml      packages.<pkg>.package.current = the release it last changed in
-  package/install/   spec.package pinned to ghcr.io/wxops/wxops-core-<pkg>:<release>
+  package/install/   spec.package pinned to ghcr.io/wxops/wxops-core/<pkg>:<release>
 
 CI then builds exactly the packages whose `current` equals the pushed tag. No
 job commits back to main: a bot rewriting install manifests after the tag is
@@ -38,7 +38,7 @@ sys.path.insert(0, str(ROOT / "tests" / "lib"))
 import releases as REL  # noqa: E402
 import yaml  # noqa: E402
 
-REGISTRY = "ghcr.io/wxops"
+REGISTRY = "ghcr.io/wxops/wxops-core"
 VERSIONS = ROOT / "VERSIONS.yaml"
 INSTALL = ROOT / "package" / "install"
 NOTES = ROOT / "release-notes"
@@ -49,7 +49,7 @@ MANIFEST = """\
 apiVersion: pkg.crossplane.io/v1
 kind: Configuration
 metadata:
-  name: wxops-core-{pkg}
+  name: {pkg}
 spec:
   package: {image}
   packagePullPolicy: IfNotPresent
@@ -66,7 +66,7 @@ def current(info) -> str:
 
 
 def image(pkg: str, release: str) -> str:
-    return f"{REGISTRY}/wxops-core-{pkg}:{release}"
+    return f"{REGISTRY}/{pkg}:{release}"
 
 
 def rel(path: Path) -> str:
@@ -228,7 +228,7 @@ def check() -> int:
         repo, _, tag = (m.group(1) if m else "").rpartition(":")
         if tag != cur:
             problems.append(f"{pkg}: {rel(path)} pins `{tag or '?'}`, VERSIONS.yaml says `{cur}`")
-        want = f"{REGISTRY}/wxops-core-{pkg}"
+        want = f"{REGISTRY}/{pkg}"
         if repo != want:
             if REL.RELEASE_RE.match(cur):
                 problems.append(f"{pkg}: {rel(path)} pulls from `{repo}`, not `{want}`")

@@ -33,7 +33,7 @@ permissions:
   packages: write   # push to ghcr.io
 
 env:
-  REGISTRY: ghcr.io/wxops
+  REGISTRY: ghcr.io/wxops/wxops-core
 
 jobs:
   validate:
@@ -108,22 +108,22 @@ jobs:
         run: |
           crossplane xpkg build \
             -f package/${{ matrix.package }} \
-            -o wxops-core-${{ matrix.package }}.xpkg \
+            -o ${{ matrix.package }}.xpkg \
             --ignore kustomization.yaml
 
       - name: Push release tag
         if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
-            ${{ env.REGISTRY }}/wxops-core-${{ matrix.package }}:${{ github.ref_name }} \
-            -f wxops-core-${{ matrix.package }}.xpkg
+            ${{ env.REGISTRY }}/${{ matrix.package }}:${{ github.ref_name }} \
+            -f ${{ matrix.package }}.xpkg
 
       - name: Push latest tag
         if: steps.changed.outputs.value == 'true'
         run: |
           crossplane xpkg push \
-            ${{ env.REGISTRY }}/wxops-core-${{ matrix.package }}:latest \
-            -f wxops-core-${{ matrix.package }}.xpkg
+            ${{ env.REGISTRY }}/${{ matrix.package }}:latest \
+            -f ${{ matrix.package }}.xpkg
 
   create-release:
     name: Create GitHub release
