@@ -7,13 +7,14 @@ organised by what you came to do.
 
 **Table of Contents**
 - [Find your way](#find-your-way)
-- [The six sections](#the-six-sections)
+- [The seven sections](#the-seven-sections)
   - [Learn](#learn)
   - [API reference](#api-reference)
   - [Core ideas](#core-ideas)
   - [User guide](#user-guide)
   - [Development](#development)
   - [ADR](#adr)
+  - [RFC](#rfc)
 - [How the sections connect](#how-the-sections-connect)
 - [Development matrix](#development-matrix)
 - [Where new docs go](#where-new-docs-go)
@@ -34,10 +35,11 @@ organised by what you came to do.
 | Cut a release | [Releasing](development/releasing.md) |
 | See what is built, what is planned, and what is next | [Development matrix](#development-matrix) · [`ROADMAP.md`](../ROADMAP.md) |
 | Find or record the reasoning behind a decision | [ADR](adr/README.md) |
+| Propose a design or a new capability before it is built | [RFC](rfc/README.md) |
 
 ---
 
-## The six sections
+## The seven sections
 
 ### Learn
 
@@ -127,6 +129,20 @@ discoverable without depending on anyone's memory of the conversation that produ
 | [`TEMPLATE.md`](adr/TEMPLATE.md) | Copy this to start a new one |
 | [001 — Package channel label](adr/001-package-channel-label.md) | `stable`/`nightly` over a guardrailed rollout system, and why |
 
+### RFC
+
+One committed file per proposal — a design argued before it is built. Community intake is the RFC issue; the file
+is what tracks the proposal through review, acceptance and rollout, and links to the ADRs it produces.
+
+| Doc | What it covers |
+|---|---|
+| [**RFC index**](rfc/README.md) | When to write one, the lifecycle (draft → in review → accepted → implemented), and every RFC so far |
+| [`TEMPLATE.md`](rfc/TEMPLATE.md) | Copy this to start a new one |
+| [002 — Terraform → OpenTofu](rfc/002-migrate-terraform-to-opentofu.md) | Swap the Workspace engine so the whole runtime stack is open source, and the orphan-first procedure that keeps existing Gitea resources safe — *draft* |
+| [003 — Vendor repos and OAuth applications](rfc/003-vendor-repos-and-oauth-applications.md) | Gitea/GitHub/GitLab behind one API, OAuth applications with Vault-tracked, rotatable credentials — *draft* |
+| [004 — Dex identity and Portal authentication](rfc/004-dex-identity-and-portal-authentication.md) | Dex as the OIDC issuer, `XOIDCClient` with OpenBao-held rotated secrets, the claim contract the authorization RFC keys on — *draft* |
+| [005 — Git-mapped authorization](rfc/005-git-mapped-authorization.md) | RBAC for who may act, Kyverno ABAC keyed on a `wxops.cloud/owner` label mapped one-to-one to Git teams, and the namespaced-XR alternative — *draft* |
+
 ---
 
 ## How the sections connect
@@ -140,6 +156,7 @@ flowchart LR
     DEV["Development<br/>guide · releasing"]
     RM["ROADMAP.md<br/>phases · decisions"]
     ADR["ADR<br/>why, permanently"]
+    RFC["RFC<br/>proposed before built"]
 
     LEARN -->|"prerequisite for"| DEV
     UG -->|"fields to write,<br/>status to read"| API
@@ -149,6 +166,8 @@ flowchart LR
     RM -->|"work items for"| DEV
     DEV -->|"breaking or architectural<br/>changes get"| ADR
     RM -->|"rejections point to"| ADR
+    RFC -->|"settled questions<br/>become"| ADR
+    RFC -->|"accepted work<br/>sequenced in"| RM
 
     classDef hub stroke-width:3px
     class API hub
@@ -228,6 +247,7 @@ disagree, the ROADMAP wins.
 | A how-to for people running or consuming the platform | `user-guide/` | The *User guide* table |
 | How to build, test or release | `development/` | The *Development* table, and a *Delivery and development* row if it adds a mechanism |
 | A decision of lasting consequence — breaking, architectural, a rejection | `adr/` | Copy [`TEMPLATE.md`](adr/TEMPLATE.md), add a row to [`adr/README.md`](adr/README.md)'s index and the *ADR* table above |
+| A proposal to argue before building — new capability, new package, a schema or tooling change | `rfc/` | Copy [`TEMPLATE.md`](rfc/TEMPLATE.md), add a row to [`rfc/README.md`](rfc/README.md)'s index |
 
-These six folders are the whole layout; do not add another. Prose wraps at about 100 characters
+These seven folders are the whole layout; do not add another. Prose wraps at about 160 characters
 (see [`CLAUDE.md`](../CLAUDE.md#documentation-conventions)).

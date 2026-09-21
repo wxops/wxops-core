@@ -19,6 +19,7 @@ each against a real file in this repo.
 - Every doc, and the development matrix → [`docs/README.md`](docs/README.md)
 - Hooks, make targets and releasing, in one place → [`docs/development/`](docs/development/README.md)
 - Recording *why* for a breaking or architectural decision → [`docs/adr/`](docs/adr/README.md)
+- Proposing a design before it is built → [`docs/rfc/`](docs/rfc/README.md)
 
 ---
 

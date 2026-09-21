@@ -63,8 +63,8 @@ What this RFC deliberately does not cover, so review stays bounded.
 ---
 <!--
 Lifecycle: needs-review → accepted (label) or declined (closed with reason).
-Accepted RFCs graduate to a design doc in docs/ (see multi-cluster.md →
-multi-cluster-proposal.md for the pattern) or straight to a PR when small.
+An RFC worth keeping graduates to a committed file, docs/rfc/NNN-title.md
+(see docs/rfc/README.md), or straight to a PR when small.
 Decisions of lasting consequence also get a row in ROADMAP.md
 "Decided and rejected", linking back to this issue as the full record.
 -->

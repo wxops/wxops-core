@@ -70,7 +70,7 @@ version, not the release name — see [`release-notes/README.md`](release-notes/
 - `kcl/<name>/` — KCL composition source (`kcl.mod`, `main.k`)
 - `examples/<name>/` — minimal XR YAML to exercise each package
 - `tests/cases/<name>/` — test cases; `tests/lib/` shared harness (see [Testing](#testing))
-- `docs/` — six sections behind one hub, `docs/README.md`, which also holds the
+- `docs/` — seven sections behind one hub, `docs/README.md`, which also holds the
   **development matrix** (every package, core idea and delivery mechanism, its state and next step).
   Check the matrix and `docs/core-ideas/solution-matrix.md` before proposing work: they record what's
   shipped, designed and rejected. The sections:
@@ -86,6 +86,8 @@ version, not the release name — see [`release-notes/README.md`](release-notes/
   - `docs/adr/` — one committed file per decision of lasting consequence (`TEMPLATE.md`, `README.md`
     for the lifecycle); breaking or architectural changes get one, so the reasoning survives
     independent of any single conversation — see [ADR-001](docs/adr/001-package-channel-label.md)
+  - `docs/rfc/` — one committed file per proposal, argued before it is built (`TEMPLATE.md`, `README.md`
+    for the lifecycle); community intake is the RFC issue template, the file is the tracked plan
 
   No other folders under `docs/`; the hub's *Where new docs go* table says which section a new doc
   belongs in.

@@ -17,9 +17,8 @@ discoverable independent of anyone's memory of the conversation that produced it
    says so in its own Context section and links back. An accepted ADR is never edited after the fact
    — that would erase the record this convention exists to keep.
 
-Related: an [RFC issue](../../.github/ISSUE_TEMPLATE/rfc.md) argues a design *before* it happens, when
-the open question is an option space rather than a single decision. An accepted RFC often produces an
-ADR as its residue.
+Related: an [RFC](../rfc/README.md) argues a design *before* it happens, when the open question is an
+option space rather than a single decision. An accepted RFC often produces an ADR as its residue.
 
 ## Index
 
