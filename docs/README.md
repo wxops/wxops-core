@@ -142,6 +142,7 @@ is what tracks the proposal through review, acceptance and rollout, and links to
 | [003 — Vendor repos and OAuth applications](rfc/003-vendor-repos-and-oauth-applications.md) | Gitea/GitHub/GitLab behind one API, OAuth applications with Vault-tracked, rotatable credentials — *draft* |
 | [004 — Dex identity and Portal authentication](rfc/004-dex-identity-and-portal-authentication.md) | Dex as the OIDC issuer, `XOIDCClient` with OpenBao-held rotated secrets, the claim contract the authorization RFC keys on — *draft* |
 | [005 — Git-mapped authorization](rfc/005-git-mapped-authorization.md) | RBAC for who may act, Kyverno ABAC keyed on a `wxops.cloud/owner` label mapped one-to-one to Git teams, and the namespaced-XR alternative — *draft* |
+| [006 — Cloudflare R2](rfc/006-cloudflare-r2-object-storage-and-backup.md) | The first third-party service: R2 buckets and scoped credentials for backup and tenant object storage, and the pattern a second service follows — *draft* |
 
 ---
 
