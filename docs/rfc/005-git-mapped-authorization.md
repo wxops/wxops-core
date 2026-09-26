@@ -60,7 +60,9 @@ guardrails, so this RFC uses it for ABAC rather than adding an engine.
 The `wxops.cloud/owner` label is the trust anchor and is added to every kind by policy, not by an XRD change, so it is
 `safe`-tier. It is required at creation and **immutable**, so a resource cannot be reassigned to escape a rule. Its value is
 the Git team's slug — deliberately the same string a namespaced XR's namespace would carry (see Alternatives), so this design
-does not paint a later move into a corner.
+does not paint a later move into a corner. A Kubernetes label value cannot contain `/`, so the owner is a **flat** slug: a GitHub or
+Gitea org, or a top-level GitLab group. GitLab subgroup paths (`parent/child`) are not supported in v1, as decided in
+[RFC-003](003-scm-connections-and-resources.md#vendor-alignment).
 
 ### The one-to-one rule
 
@@ -114,8 +116,9 @@ migration; that is a follow-up this RFC surfaces rather than absorbs.
 
 Kubernetes RBAC stays small and static, in the GitOps repository: a handful of `ClusterRole`s (`wxops-user`: create/update Core
 kinds; `wxops-viewer`: read) bound to the Dex groups. This layer answers "may this kind of subject touch this kind of
-resource at all" and Kyverno answers the rest. Bindings for the group subjects are written in the GitOps repository like any
-other manifest; the compositions and Kyverno emit none, keeping the rule in `CLAUDE.md` intact.
+resource at all" and Kyverno answers the rest. Platform-owned kinds such as `XScmConnection` ([RFC-003](003-scm-connections-and-resources.md)) get no
+tenant `create` verb at all, which plain RBAC can express because they are distinct kinds. Bindings for the group subjects are written in
+the GitOps repository like any other manifest; the compositions and Kyverno emit none, keeping the rule in `CLAUDE.md` intact.
 
 ### Rollout safety
 
@@ -208,3 +211,6 @@ authorization, and the namespaced-versus-cluster-scoped decision, whichever way 
 7. **Cross-owner references.** A `tenant-app` referencing a shared database cluster, or an `XTenantDatabase` targeting another
    owner's cluster, crosses ownership by design. Is that a rule 6, or handled by the shared-cluster tiering already in place?
 8. **Audit.** Where do Kyverno's policy reports and the break-glass events go, and who reads them?
+9. **Tenant = org or team?** The existing `XGiteaOrg` documents one organization per tenant, and [RFC-003](003-scm-connections-and-resources.md)'s
+   `owner` is that org or top-level group, while this RFC keys the owner label on a team slug within an org. With org, team and user now
+   in the same neutral family, the two need one answer; the rules in *The one-to-one rule* change depending on it.

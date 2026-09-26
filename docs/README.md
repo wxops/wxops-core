@@ -139,8 +139,8 @@ is what tracks the proposal through review, acceptance and rollout, and links to
 | [**RFC index**](rfc/README.md) | When to write one, the lifecycle (draft → in review → accepted → implemented), and every RFC so far |
 | [`TEMPLATE.md`](rfc/TEMPLATE.md) | Copy this to start a new one |
 | [002 — Terraform → OpenTofu](rfc/002-migrate-terraform-to-opentofu.md) | Swap the Workspace engine so the whole runtime stack is open source, and the orphan-first procedure that keeps existing Gitea resources safe — *draft* |
-| [003 — Vendor repos and OAuth applications](rfc/003-vendor-repos-and-oauth-applications.md) | Gitea/GitHub/GitLab behind one API, OAuth applications with Vault-tracked, rotatable credentials — *draft* |
-| [004 — Dex identity and Portal authentication](rfc/004-dex-identity-and-portal-authentication.md) | Dex as the OIDC issuer, `XOIDCClient` with OpenBao-held rotated secrets, the claim contract the authorization RFC keys on — *draft* |
+| [003 — SCM connections and resources](rfc/003-scm-connections-and-resources.md) | `XScmConnection` + `scmRef`, and `XScmOrg`/`Team`/`User`/`Repository`/`OAuthApp` across Gitea/GitHub/GitLab with `managed \| observed` modes, a migration path off `gitea-*`, and Vault-tracked credentials — *draft* |
+| [004 — Dex identity and Portal authentication](rfc/004-dex-identity-and-portal-authentication.md) | Dex configured entirely through Core (`XDexConnector`, `XOIDCClient` → OpenBao → rendered config → Reloader), and the claim contract the authorization RFC keys on — *draft, next release* |
 | [005 — Git-mapped authorization](rfc/005-git-mapped-authorization.md) | RBAC for who may act, Kyverno ABAC keyed on a `wxops.cloud/owner` label mapped one-to-one to Git teams, and the namespaced-XR alternative — *draft* |
 | [006 — Cloudflare R2](rfc/006-cloudflare-r2-object-storage-and-backup.md) | The first third-party service: R2 buckets and scoped credentials for backup and tenant object storage, and the pattern a second service follows — *draft* |
 

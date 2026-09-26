@@ -10,7 +10,7 @@ Replace `provider-terraform` (which runs the `terraform` binary) with `provider-
 behind every inline-HCL `Workspace` in Core, so the whole runtime stack — Crossplane, providers, functions and now the
 infrastructure engine — carries an OSI-approved open-source licence consistent with this repository's Apache-2.0. The HCL in
 the compositions stays; the composed resource's API group, the provider install, the state hand-over and the documentation
-change. It lands before [RFC-003](003-vendor-repos-and-oauth-applications.md) so new packages are written against the final
+change. It lands before [RFC-003](003-scm-connections-and-resources.md) so new packages are written against the final
 engine.
 
 ## Motivation
@@ -41,7 +41,7 @@ init/plan/apply` in the provider pod, connection secret from outputs), so the co
 |---|---|---|
 | Provider package | `xpkg.upbound.io/upbound/provider-terraform:v1.1.5` | `xpkg.upbound.io/upbound/provider-opentofu` — pin the current `v1.1.x` at implementation time |
 | Workspace | `tf.upbound.io/v1beta1` `Workspace` | `opentofu.upbound.io/v1beta1` `Workspace` |
-| ProviderConfig | `tf.upbound.io/v1beta1` `ProviderConfig` named `default`, Kubernetes state backend | the `opentofu.upbound.io` equivalent, same backend — exact kind and fields to confirm |
+| ProviderConfig | `tf.upbound.io/v1beta1` `ProviderConfig` named `default`, Kubernetes state backend | the `opentofu.upbound.io` equivalent, same backend — exact kind and fields to confirm. `provider-opentofu` keeps no state of its own, so the Kubernetes backend (or a preserved `/tf` directory) is required, not optional |
 | Binary | `terraform` | `tofu` |
 
 ### What changes in this repo
@@ -106,18 +106,26 @@ it does, the release notes with the procedure above are required, and no allowli
 - A compile-time check that each inline HCL module is valid for OpenTofu (`tofu validate` against the module) is possible but
   needs provider plugins downloaded; whether it is worth a network-dependent CI step is an open question.
 
-The offline suite cannot show that `tofu` actually applies this HCL against Gitea. That needs a cluster, so the smoke test is
-manual until the kind-based e2e tier exists: one `XGiteaOrg`, one `XGiteaRepository`, and one `XRandomPassword` reconciled
-end to end against a scratch Gitea.
+The offline suite cannot show that `tofu` actually applies this HCL against Gitea, and it never could — Gitea acceptance has always been
+manual. That needs a cluster and a **live Gitea that accepts writes**. The maintainer's own instance is archived and read-only, so it cannot
+be the target; a throwaway Gitea (MIT-licensed, one container) in the same kind cluster is the acceptance environment. The smoke test is
+manual until the kind-based e2e tier exists: one `XGiteaOrg`, one `XGiteaTeam`, one `XGiteaRepository`, one `XGiteaUser` and one
+`XRandomPassword` reconciled end to end against it, then deleted to confirm cleanup.
+
+Nothing about the Gitea integration itself changes: the plugin is still `go-gitea/gitea ~> 0.7.0` and the API calls are the same. What is
+being validated is the engine and the Workspace API group, not Gitea's behaviour.
 
 ## Drawbacks
 
 - **A one-off migration with a data-loss path** (the Workspace-deletion trap above) for a benefit that is legal and
   positioning rather than functional. The procedure removes the risk; it does not remove the work.
 - **State hand-over depends on a version fact not yet checked**, and may force the import route.
-- **The provider registry story changes.** `tofu init` resolves providers through the OpenTofu registry; the providers used
-  here (`hashicorp/random`, `go-gitea/gitea`, and RFC-003's `integrations/github` and `gitlabhq/gitlab`) need confirming as
-  available there at the pinned versions.
+- **The provider registry story changes.** `tofu init` resolves providers through the OpenTofu registry. `go-gitea/gitea` is listed there
+  at v0.6.0 and v0.7.0, so the pinned `~> 0.7.0` should resolve; `hashicorp/random` and RFC-003's `integrations/github` and
+  `gitlabhq/gitlab` are still to be confirmed at their pinned versions.
+- **A slower default poll.** The `provider-opentofu` documentation notes a default polling interval of 10 minutes rather than 1, which
+  would slow drift detection on existing Workspaces (not first apply). Whether that describes this provider and this version is to be
+  confirmed, and the interval is configurable if it matters.
 - **Two upstreams to follow instead of one** while both providers coexist during the cut-over, and a permanent dependency on
   `provider-opentofu` staying maintained. It is an Upbound project like `provider-terraform`, but its cadence should be read
   before committing.
@@ -137,11 +145,14 @@ end to end against a scratch Gitea.
 
 ## Rollout Plan
 
-- [ ] **Spike, before acceptance.** Answer the three checkable questions: which Terraform version the current provider image
-  ships; whether `provider-terraform` can run `tofu` directly; whether the OpenTofu registry serves the four providers.
+- [ ] **Spike, before acceptance.** Answer the checkable questions: which Terraform version the current provider image ships; whether
+  `provider-terraform` can run `tofu` directly; whether the OpenTofu registry serves `hashicorp/random` (`go-gitea/gitea` is already
+  confirmed); the exact `provider-opentofu` `ProviderConfig` shape and its default poll interval; and stand up the scratch Gitea.
 - [ ] **Phase 1 — provider and `random-password`.** Install `provider-opentofu` beside `provider-terraform`; migrate
   `random-password`, the simplest Workspace (no external system), through the full procedure as the rehearsal.
-- [ ] **Phase 2 — the four `gitea-*` packages**, orphan-first as above, against the scratch Gitea, then the real instance.
+- [ ] **Phase 2 — the four `gitea-*` packages**, orphan-first as above, against the scratch Gitea. If the maintainer's cluster still holds
+  Workspaces for the archived instance, their state hand-over is checked with a read-only `plan` — the archived Gitea accepts no writes,
+  so a clean plan is the whole test there.
 - [ ] **Phase 3 — remove `provider-terraform`**, then the docs, `NOTICE`, diagram and learn-page rename in one pass.
 - [ ] **Release** with hand-written release notes carrying the upgrade procedure, since the change touches running state.
 

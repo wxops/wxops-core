@@ -46,7 +46,7 @@ considered* → *Alternatives*, *Motivation / problem statement* → *Motivation
 | RFC | Title | Status |
 |---|---|---|
 | [002](002-migrate-terraform-to-opentofu.md) | Migrate the Workspace engine from Terraform to OpenTofu | Draft |
-| [003](003-vendor-repos-and-oauth-applications.md) | Vendor-neutral repositories and OAuth applications, with Vault-tracked credentials | Draft |
-| [004](004-dex-identity-and-portal-authentication.md) | Dex as the identity provider — OIDC clients, OpenBao-held secrets and rotation, Portal authentication | Draft |
+| [003](003-scm-connections-and-resources.md) | SCM connections and resources — Gitea, GitHub and GitLab behind one API, with Vault-tracked credentials | Draft |
+| [004](004-dex-identity-and-portal-authentication.md) | Dex as the identity provider — Core-rendered configuration, OpenBao-held secrets, Portal authentication | Draft — next release |
 | [005](005-git-mapped-authorization.md) | Authorization mapped one-to-one to Git — RBAC for who may act, Kyverno ABAC for on what | Draft |
 | [006](006-cloudflare-r2-object-storage-and-backup.md) | Cloudflare R2 as the first third-party service — provisioned backup and object storage | Draft |

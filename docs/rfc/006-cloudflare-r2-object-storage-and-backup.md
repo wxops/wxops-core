@@ -49,7 +49,7 @@ Six rules, so the second service is a copy rather than a redesign:
 2. **Provisioning goes through the existing engine.** An OpenTofu `Workspace` ([RFC-002](002-migrate-terraform-to-opentofu.md))
    running the vendor's provider, as the `gitea-*` packages do. See Alternatives for the native-provider option.
 3. **Each resource gets its own scoped credential**, minted at creation and pushed to OpenBao by the same `PushSecret` path as
-   [RFC-003](003-vendor-repos-and-oauth-applications.md) and [RFC-004](004-dex-identity-and-portal-authentication.md).
+   [RFC-003](003-scm-connections-and-resources.md) and [RFC-004](004-dex-identity-and-portal-authentication.md).
 4. **Ownership is the `wxops.cloud/owner` label** and authorization is [RFC-005](005-git-mapped-authorization.md)'s.
 5. **Deletion never destroys data by default.** Removing an XR retains the resource unless the XR says otherwise.
 6. **Cost is a first-class attribute.** Every third-party resource can cost money; the design says what bounds it.
@@ -75,7 +75,7 @@ spec:
       expireAfterDays: 0         # 0 = never
     rotation:
       generation: 1              # bump to rotate the credential
-    accountRef: {name: cloudflare-prod}   # the environment's Cloudflare account; its credential is platform-only
+    accountRef: {name: cloudflare-prod}   # the environment's Cloudflare account; same indirection as RFC-003's `scmRef`, credential platform-only
 status:
   created: true
   ready: true
